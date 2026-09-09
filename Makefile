@@ -1,5 +1,3 @@
-APP_NAME=api
-
 include .env
 export
 
