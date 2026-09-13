@@ -1,2 +1,2 @@
-# Go-Oauth.
+# Go-Oauth
 
