@@ -11,7 +11,7 @@ import (
 )
 
 func New(cfg config.DatabaseConfig) (*sql.DB, error) {
-	db, err := sql.Open("pgx", cfg.URL)
+	db, err := sql.Open(cfg.DBDriver, cfg.URL)
 	if err != nil {
 		return nil, err
 	}
