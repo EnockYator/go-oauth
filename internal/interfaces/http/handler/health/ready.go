@@ -6,7 +6,7 @@ import (
 	"net/http"
 	"time"
 
-	healthdto "github.com/EnockYator/go-oauth/internal/interfaces/http/dto/health"
+	"github.com/EnockYator/go-oauth/internal/interfaces/http/dto/health"
 	"github.com/EnockYator/go-oauth/internal/interfaces/http/response"
 	"github.com/EnockYator/go-oauth/internal/shared/apperror"
 )
@@ -18,7 +18,7 @@ import (
 // @Tags Health
 // @Accept json
 // @Produce json
-// @Success 200 {object} healthdto.HealthResponse
+// @Success 200 {object} health.HealthResponse
 // @Failure 500 {object} map[string]any
 // @Router /health/ready [get]
 func Ready(db *sql.DB) http.HandlerFunc {
@@ -44,7 +44,7 @@ func Ready(db *sql.DB) http.HandlerFunc {
 		response.WriteResponse(
 			w,
 			http.StatusOK,
-			healthdto.HealthResponse{
+			health.HealthResponse{
 				Status:      "ready",
 				Application: "go-oauth-database",
 			},
