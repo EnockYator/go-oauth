@@ -28,9 +28,15 @@ type OauthConfig struct {
 	GoogleClientSecret string `validate:"required"`
 }
 
+type OTelConfig struct {
+	Endpoint string
+	SampleRatio float64
+}
+
 type Config struct {
 	App App
 	Server   ServerConfig 
 	Database DatabaseConfig
 	Oauth OauthConfig
+	OTel OTelConfig
 }
