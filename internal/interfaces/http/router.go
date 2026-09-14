@@ -9,8 +9,8 @@ import (
 	"time"
 
 	"github.com/EnockYator/go-oauth/internal/domain/auth/infrastructure/jwt"
-	"github.com/EnockYator/go-oauth/internal/interfaces/http/handler/health"
 	"github.com/EnockYator/go-oauth/internal/interfaces/http/handler/root"
+	"github.com/EnockYator/go-oauth/internal/interfaces/http/handler/health"
 	"github.com/EnockYator/go-oauth/internal/interfaces/http/middleware"
 
 	httpSwagger "github.com/swaggo/http-swagger"
@@ -68,7 +68,7 @@ func NewRouter(cfg RouterConfig) (*Router, error) {
 
 	// Public routes (no authentication required)
 	publicMux := http.NewServeMux()
-	publicMux.HandleFunc("/", root.RootHandler)
+	publicMux.HandleFunc("/", root.Root)
 	publicMux.HandleFunc("/health", health.Health)
 	publicMux.HandleFunc("/health/live", health.Live)
 	publicMux.HandleFunc("/health/ready", health.Ready(cfg.DB))
