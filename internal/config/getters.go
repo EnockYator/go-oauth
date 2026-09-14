@@ -33,6 +33,23 @@ func getEnvInt(key string, defaultValue int) (int)  {
 	return defaultValue
 }
 
+// getEnvInt gets the interger value of the evironment variable that matches the key.
+// If the value is 0, it returns the default value passed.
+func getEnvFloat64(key string, defaultValue float64) float64  {
+	if value := os.Getenv(key); value != "" {
+		f, err := strconv.ParseFloat(value, 64)
+		if err != nil {
+			slog.Error(
+				"failed converting string env value to interger",
+				slog.Any("env_value", err),
+			)
+			os.Exit(1)
+		}
+		return f
+	}
+	return defaultValue
+}
+
 // getEnvDuration gets the duration value of the evironment variable that matches the key
 // If the duration is not set, it returns the default value passed.
 func getEnvDuration(key string, defaultValue time.Duration) (time.Duration)  {

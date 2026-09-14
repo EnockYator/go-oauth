@@ -27,6 +27,10 @@ func Load() (*Config, error) {
 			GoogleClientId: getEnvStr("GOOGLE_CLIENT_ID", ""),
     		GoogleClientSecret: getEnvStr("GOOGLE_CLIENT_SECRET", ""),
 		},
+		OTel: OTelConfig{
+			Endpoint: getEnvStr("OTEL_EXPORTER_OTLP_ENDPOINT", ""),
+			SampleRatio: getEnvFloat64("OTEL_TRACES_SAMPLER_RATIO", 0.1),
+		},
 	}
 
 	return cfg, nil
