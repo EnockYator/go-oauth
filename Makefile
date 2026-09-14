@@ -113,21 +113,21 @@ clean-test-cache:
 
 build-api:
 	mkdir -p bin
-	go build -o bin/api ./internal/cmd/api
+	go build -o bin/api ./cmd/api
 
 
 build-migrate:
 	mkdir -p bin
-	go build -o bin/migrate ./internal/cmd/migrate
+	go build -o bin/migrate ./cmd/migrate
 
 air:
 	air
 
 run-api:
-	go run ./internal/cmd/api/main.go
+	go run ./cmd/api/main.go
 
 run-migrate:
-	go run ./internal/cmd/migrate/main.go
+	go run ./cmd/migrate/main.go
 
 # ===============================
 #	API Documentation
