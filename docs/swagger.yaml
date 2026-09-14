@@ -1,0 +1,351 @@
+definitions:
+  apperror.ErrorCode:
+    enum:
+    - INTERNAL_SERVER_ERROR
+    - BAD_REQUEST
+    - METHOD_NOT_ALLOWED
+    - UNAUTHORIZED
+    - FORBIDDEN
+    - NOT_FOUND
+    - VALIDATION_ERROR
+    - SERVICE_UNAVAILABLE
+    - CONFLICT
+    - TOO_MANY_REQUESTS
+    - REQUIRED_FIELD
+    - INVALID_EMAIL_FORMAT
+    - VALIDATION_FAILED
+    - DB_CONNECTION_FAILED
+    - DB_QUERY_FAILED
+    - DB_RECORD_NOT_FOUND
+    - DB_TRANSACTION_FAILED
+    - DB_CONSTRAINT_VIOLATION
+    - EXTERNAL_SERVICE_FAILURE
+    - EXTERNAL_SERVICE_TIMEOUT
+    - EXTERNAL_SERVICE_UNAVAILABLE
+    - FILE_NOT_FOUND
+    - FILE_UPLOAD_FAILED
+    - FILE_TOO_LARGE
+    - FILE_INVALID_TYPE
+    - RATE_LIMIT_EXCEEDED
+    - SUSPICIOUS_ACTIVITY
+    - REQUEST_TIMEOUT
+    - CIRCUIT_BREAKER_OPEN
+    - DEPENDENCY_FAILURE
+    - SHUTDOWN_IN_PROGRESS
+    - AUTH_INVALID_CREDENTIALS
+    - AUTH_TOKEN_EXPIRED
+    - AUTH_TOKEN_INVALID
+    - AUTH_TOKEN_MISSING
+    - AUTH_SESSION_EXPIRED
+    - AUTH_ACCOUNT_LOCKED
+    - AUTH_MFA_REQUIRED
+    - AUTH_PERMISSION_DENIED
+    - AUTH_IP_ADRRESS_BLOCKED
+    - USER_NOT_FOUND
+    - USER_ALREADY_EXISTS
+    - USER_EMAIL_INVALID
+    - PAYMENT_FAILED
+    - PAYMENT_DECLINED
+    - PAYMENT_REQUIRED
+    - BILLING_NOT_FOUND
+    - SUBSCRIPTION_EXPIRED
+    - SUBSCRIPTION_INVALID
+    - STORAGE_LIMIT_REACHED
+    - CLOUD_STORAGE_UNAVAILABLE
+    - TENANT_NOT_FOUND
+    - TENANT_INACTIVE
+    - TENANT_ID_MISSING
+    - TENANT_ID_INVALID
+    - TENANT_ACCESS_DENIED
+    type: string
+    x-enum-comments:
+      CodeAuthAccountLocked: "423"
+      CodeAuthInvalidCredentials: "401"
+      CodeAuthMFARequired: "401"
+      CodeAuthPermissionDenied: "403"
+      CodeAuthSessionExpired: "401"
+      CodeAuthTokenExpired: "401"
+      CodeAuthTokenInvalid: "401"
+      CodeAuthTokenMissing: "401"
+      CodeBadRequest: "400"
+      CodeBillingNotFound: "404"
+      CodeCircuitBreakerOpen: "503"
+      CodeCloudStorageLimitReached: "507"
+      CodeCloudStorageUnavailable: "503"
+      CodeConflict: "409"
+      CodeDBConnectionFailed: "503"
+      CodeDBConstraintFail: "409"
+      CodeDBQueryFailed: "500"
+      CodeDBRecordNotFound: "404"
+      CodeDBTransactionFail: "500"
+      CodeDependencyFailure: "503"
+      CodeExternalServiceFailure: "502"
+      CodeExternalTimeout: "504"
+      CodeExternalUnavailable: "503"
+      CodeFileInvalidType: "415"
+      CodeFileNotFound: "404"
+      CodeFileTooLarge: "413"
+      CodeFileUploadFailed: "500"
+      CodeForbidden: "403"
+      CodeIPBlocked: "403"
+      CodeInternalServerError: "500"
+      CodeMethodNotAllowed: "405"
+      CodeNotFound: "404"
+      CodePaymentDeclined: "402"
+      CodePaymentFailed: "402"
+      CodePaymentRequired: "402"
+      CodeRateLimitExceeded: "429"
+      CodeRequestTimeout: 504 / 504
+      CodeServiceUnavailable: "503"
+      CodeShutdownInProgress: "503"
+      CodeSubscriptionExpired: "402"
+      CodeSubscriptionInvalid: "422"
+      CodeSuspiciousActivity: "403"
+      CodeTenantAccessDenied: "403"
+      CodeTenantIDInvalid: "400"
+      CodeTenantIDMissing: "400"
+      CodeTenantInactive: "403"
+      CodeTenantNotFound: "404"
+      CodeTooManyRequests: "429"
+      CodeUnauthorized: "401"
+      CodeUserAlreadyExists: "409"
+      CodeUserEmailInvalid: "422"
+      CodeUserNotFound: "404"
+      CodeValidation: "422"
+      CodeValidationFailed: "422"
+      CodeValidationInvalidEmailFormat: "422"
+      CodeValidationRequiredField: "422"
+    x-enum-descriptions:
+    - "500"
+    - "400"
+    - "405"
+    - "401"
+    - "403"
+    - "404"
+    - "422"
+    - "503"
+    - "409"
+    - "429"
+    - "422"
+    - "422"
+    - "422"
+    - "503"
+    - "500"
+    - "404"
+    - "500"
+    - "409"
+    - "502"
+    - "504"
+    - "503"
+    - "404"
+    - "500"
+    - "413"
+    - "415"
+    - "429"
+    - "403"
+    - 504 / 504
+    - "503"
+    - "503"
+    - "503"
+    - "401"
+    - "401"
+    - "401"
+    - "401"
+    - "401"
+    - "423"
+    - "401"
+    - "403"
+    - "403"
+    - "404"
+    - "409"
+    - "422"
+    - "402"
+    - "402"
+    - "402"
+    - "404"
+    - "402"
+    - "422"
+    - "507"
+    - "503"
+    - "404"
+    - "403"
+    - "400"
+    - "400"
+    - "403"
+    x-enum-varnames:
+    - CodeInternalServerError
+    - CodeBadRequest
+    - CodeMethodNotAllowed
+    - CodeUnauthorized
+    - CodeForbidden
+    - CodeNotFound
+    - CodeValidation
+    - CodeServiceUnavailable
+    - CodeConflict
+    - CodeTooManyRequests
+    - CodeValidationRequiredField
+    - CodeValidationInvalidEmailFormat
+    - CodeValidationFailed
+    - CodeDBConnectionFailed
+    - CodeDBQueryFailed
+    - CodeDBRecordNotFound
+    - CodeDBTransactionFail
+    - CodeDBConstraintFail
+    - CodeExternalServiceFailure
+    - CodeExternalTimeout
+    - CodeExternalUnavailable
+    - CodeFileNotFound
+    - CodeFileUploadFailed
+    - CodeFileTooLarge
+    - CodeFileInvalidType
+    - CodeRateLimitExceeded
+    - CodeSuspiciousActivity
+    - CodeRequestTimeout
+    - CodeCircuitBreakerOpen
+    - CodeDependencyFailure
+    - CodeShutdownInProgress
+    - CodeAuthInvalidCredentials
+    - CodeAuthTokenExpired
+    - CodeAuthTokenInvalid
+    - CodeAuthTokenMissing
+    - CodeAuthSessionExpired
+    - CodeAuthAccountLocked
+    - CodeAuthMFARequired
+    - CodeAuthPermissionDenied
+    - CodeIPBlocked
+    - CodeUserNotFound
+    - CodeUserAlreadyExists
+    - CodeUserEmailInvalid
+    - CodePaymentFailed
+    - CodePaymentDeclined
+    - CodePaymentRequired
+    - CodeBillingNotFound
+    - CodeSubscriptionExpired
+    - CodeSubscriptionInvalid
+    - CodeCloudStorageLimitReached
+    - CodeCloudStorageUnavailable
+    - CodeTenantNotFound
+    - CodeTenantInactive
+    - CodeTenantIDMissing
+    - CodeTenantIDInvalid
+    - CodeTenantAccessDenied
+  apperror.ErrorDetail:
+    properties:
+      field:
+        type: string
+      message:
+        type: string
+    type: object
+  health.HealthResponse:
+    properties:
+      application:
+        type: string
+      status:
+        type: string
+    type: object
+  response.APIErrorResponse:
+    properties:
+      code:
+        $ref: '#/definitions/apperror.ErrorCode'
+      details:
+        items:
+          $ref: '#/definitions/apperror.ErrorDetail'
+        type: array
+      message:
+        type: string
+      request_id:
+        type: string
+    type: object
+  root.RootResponse:
+    properties:
+      app_env:
+        type: string
+      app_name:
+        type: string
+      app_version:
+        type: string
+      status:
+        type: string
+    type: object
+info:
+  contact: {}
+paths:
+  /:
+    get:
+      consumes:
+      - application/json
+      description: Returns root endpoint
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/root.RootResponse'
+        "405":
+          description: Method Not Allowed
+          schema:
+            $ref: '#/definitions/response.APIErrorResponse'
+      summary: Root endpoint
+      tags:
+      - Root
+  /health:
+    get:
+      consumes:
+      - application/json
+      description: Returns service health status
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/health.HealthResponse'
+        "405":
+          description: Method Not Allowed
+          schema:
+            $ref: '#/definitions/response.APIErrorResponse'
+      summary: Health check
+      tags:
+      - Health
+  /health/live:
+    get:
+      consumes:
+      - application/json
+      description: Returns service health live status
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/health.HealthResponse'
+        "500":
+          description: Internal Server Error
+          schema:
+            additionalProperties: true
+            type: object
+      summary: Health Live check
+      tags:
+      - Health
+  /health/ready:
+    get:
+      consumes:
+      - application/json
+      description: Returns database readiness status
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/health.HealthResponse'
+        "500":
+          description: Internal Server Error
+          schema:
+            additionalProperties: true
+            type: object
+      summary: Database readiness check
+      tags:
+      - Health
+swagger: "2.0"
