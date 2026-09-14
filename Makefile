@@ -23,6 +23,13 @@ help:
 	@echo "  clean-cache					Delete cached go data"
 	@echo "  clean-test-cache				Delete cached go test data\n"
 
+	@echo "Build & Run:"
+	@echo "  build-api						Build api binary"
+	@echo "  build-migrate					Build migrate binary"
+	@echo "  air							Run app on hot-reload"
+	@echo "  run-api						Run api"
+	@echo "  run-migrate					Run migrate\n"
+
 	@echo "API Documentation"
 	@echo "  swagger					Document API in swagger\n"
 
@@ -106,18 +113,21 @@ clean-test-cache:
 
 build-api:
 	mkdir -p bin
-	go build -o bin/api ./cmd/api
+	go build -o bin/api ./internal/cmd/api
 
 
 build-migrate:
 	mkdir -p bin
-	go build -o bin/migrate ./cmd/migrate
+	go build -o bin/migrate ./internal/cmd/migrate
+
+air:
+	air
 
 run-api:
-	go run ./cmd/api/main.go
+	go run ./internal/cmd/api/main.go
 
 run-migrate:
-	go run .cmd/migrate/main.go
+	go run ./internal/cmd/migrate/main.go
 
 # ===============================
 #	API Documentation

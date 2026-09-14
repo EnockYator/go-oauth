@@ -77,7 +77,7 @@ func run(logger *slog.Logger) error {
 
 	logger.Info(
 		"configuration loaded",
-		slog.String("environment", cfg.AppEnv),
+		slog.String("environment", cfg.App.AppEnv),
 	)
 
 	// ---------------------------------------------------------------------
@@ -100,7 +100,7 @@ func run(logger *slog.Logger) error {
 		tracing.Config{
 			ServiceName:     serviceName,
 			ServiceVersion:   serviceVersion,
-			DeploymentEnv:    cfg.AppEnv,
+			DeploymentEnv:    cfg.App.AppEnv,
 			SamplingRatio:   0.10,
 			OTLPEndpoint:    "",
 			OTLPHeaders:     "",

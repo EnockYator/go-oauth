@@ -12,7 +12,7 @@ import (
 var validate = validator.New()
 
 // ValidateConfig checks if the loaded configuration is valid
-func ValidateConfig(cfg AppConfig) error {
+func ValidateConfig(cfg Config) error {
 	if err := validate.Struct(cfg); err != nil {
 		var validationErrors validator.ValidationErrors
 		
