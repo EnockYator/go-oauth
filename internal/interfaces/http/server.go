@@ -24,7 +24,7 @@ import (
 //
 // Application lifecycle and OS signal handling belong to main.
 type Server struct {
-	cfg *config.AppConfig
+	cfg *config.Config
 	db  *sql.DB
 
 	logger         *slog.Logger
@@ -57,7 +57,7 @@ type ServerOptions struct {
 // NewServer performs dependency wiring but does not start listening on a
 // network socket.
 func NewServer(
-	cfg *config.AppConfig,
+	cfg *config.Config,
 	db *sql.DB,
 	opts ServerOptions,
 ) (*Server, error) {
@@ -125,9 +125,8 @@ func (s *Server) Start() error {
 	s.logger.Info(
 		"HTTP server configuration",
 		slog.String("address:", s.httpServer.Addr),
-		slog.String("environment", s.cfg.AppEnv),
+		slog.String("environment", s.cfg.App.AppEnv),
 		slog.Duration("read_timeout", time.Duration(s.cfg.Server.ReadTimeout.Seconds())),
-		slog.Duration("read_header_timeout", time.Duration(s.cfg.Server.ReadHeaderTimeout.Seconds())),
 		slog.Duration("write_timeout", time.Duration(s.cfg.Server.WriteTimeout.Seconds())),
 		slog.Duration("idle_timeout", time.Duration(s.cfg.Server.IdleTimeout.Seconds())),
 	)
