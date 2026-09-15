@@ -13,10 +13,11 @@ func Load() (*Config, error) {
 		},
 		Server: ServerConfig{
 			Port: getEnvInt("SERVER_PORT", 8080),
-			ReadTimeout: getEnvDuration("SERVER_READ_TIMEOUT", 5 * time.Second),
-			WriteTimeout: getEnvDuration("SERVER_WRITE_TIMEOUT", 10 * time.Second),
-			IdleTimeout: getEnvDuration("SERVER_IDLE_TIMEOUT", 20 * time.Second),
-			ShutdownTimeout: getEnvDuration("SERVER_SHUTDOWN_TIMEOUT", 20 * time.Second),
+			ReadTimeout: getEnvDuration("SERVER_READ_TIMEOUT", 10 * time.Second),
+			ReadHeaderTimeout: getEnvDuration("SERVER_READ_HEADER_TIMEOUT", 5 * time.Second),
+			WriteTimeout: getEnvDuration("SERVER_WRITE_TIMEOUT", 30 * time.Second),
+			IdleTimeout: getEnvDuration("SERVER_IDLE_TIMEOUT", 120 * time.Second),
+			ShutdownTimeout: getEnvDuration("SERVER_SHUTDOWN_TIMEOUT", 30 * time.Second),
 		},
 		Database: DatabaseConfig{
 			DBSchema: getEnvStr("POSTGRES_DB_SCHEMA", ""),
@@ -30,6 +31,11 @@ func Load() (*Config, error) {
 		OTel: OTelConfig{
 			Endpoint: getEnvStr("OTEL_EXPORTER_OTLP_ENDPOINT", ""),
 			SampleRatio: getEnvFloat64("OTEL_TRACES_SAMPLER_RATIO", 0.1),
+			OtelShutdownTimeout: getEnvDuration("", 5),
+			// Headers map[string]string
+			TLSCAFile: getEnvStr("", ""),
+			TLSCertFile: getEnvStr("", ""),
+			TLSKeyFile: getEnvStr("", ""),
 		},
 	}
 
