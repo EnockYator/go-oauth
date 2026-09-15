@@ -1,7 +1,6 @@
 package http
 
 import (
-	"database/sql"
 	"fmt"
 	"log/slog"
 	"net/http"
@@ -9,9 +8,10 @@ import (
 	"time"
 
 	"github.com/EnockYator/go-oauth/internal/domain/auth/infrastructure/jwt"
-	"github.com/EnockYator/go-oauth/internal/interfaces/http/handler/root"
 	"github.com/EnockYator/go-oauth/internal/interfaces/http/handler/health"
+	"github.com/EnockYator/go-oauth/internal/interfaces/http/handler/root"
 	"github.com/EnockYator/go-oauth/internal/interfaces/http/middleware"
+	"github.com/jackc/pgx/v5/pgxpool"
 
 	httpSwagger "github.com/swaggo/http-swagger"
 	"go.opentelemetry.io/otel/trace"
@@ -19,7 +19,7 @@ import (
 
 // RouterConfig contains everything required to construct the HTTP router.
 type RouterConfig struct {
-	DB             *sql.DB
+	DB             *pgxpool.Pool
 	Logger *slog.Logger
 	JWTValidator   jwt.TokenValidator
 	TracerProvider trace.TracerProvider
@@ -68,13 +68,21 @@ func NewRouter(cfg RouterConfig) (*Router, error) {
 
 	// Public routes (no authentication required)
 	publicMux := http.NewServeMux()
-	publicMux.HandleFunc("/", root.Root)
-	publicMux.HandleFunc("/health", health.Health)
-	publicMux.HandleFunc("/health/live", health.Live)
-	publicMux.HandleFunc("/health/ready", health.Ready(cfg.DB))
+	
+	// Exact-match root: only matches "GET /", nothing else.
+	publicMux.HandleFunc("GET /{$}", root.Root)
+	// Explicit health and swagger routes.
+	publicMux.HandleFunc("/healthz/", health.Healthz)
 	publicMux.Handle("/swagger/", httpSwagger.Handler(
 		httpSwagger.URL("/swagger/doc.json"),
 	))
+
+	// Fallback: any unmatched path returns 404.
+	// Registered last because ServeMux resolves by specificity, not order —
+	// but keeping it last makes the intent readable.
+	publicMux.HandleFunc("/", func(w http.ResponseWriter, r *http.Request) {
+		http.NotFound(w, r)
+	})
 
 	// Protected routes (require authentication)
 	protectedMux := http.NewServeMux()
@@ -93,8 +101,9 @@ func NewRouter(cfg RouterConfig) (*Router, error) {
 	traceOpts := []middleware.TraceMiddlewareOption{
 		middleware.WithServiceName("go-oauth"),
 		middleware.WithFilter(func(r *http.Request) bool {
-			return strings.HasPrefix(r.URL.Path, "/health") ||
-				strings.HasPrefix(r.URL.Path, "/swagger")
+			p := r.URL.Path
+			return strings.HasPrefix(p, "/health") ||
+				strings.HasPrefix(p, "/swagger")
 		}),
 	}
 
@@ -107,21 +116,21 @@ func NewRouter(cfg RouterConfig) (*Router, error) {
 	// ------------------------------------------------------------
 
 	// Middleware order (outer → inner):
-	// 1. Recovery (catch panics)
-	// 2. Request ID (add unique ID to context)
-	// 3. Tracing (distributed tracing)
-	// 4. CORS (handle cross-origin requests)
-	// 5. Rate Limiting (throttle excessive requests)
-	// 6. Logging (request/response logging)
-	// 7. Timeout (request deadline enforcement)
-	// 8. Router (actual request handling)
-	// Recovery → RequestID → Trace → CORS → RateLimit → Logger → Timeout → Router
-	handler := middleware.RecoveryMiddleware()(
+	// 1. Tracing  →  starts server span, injects it into r.Context()
+	// 2. Recovery  →  catch panics
+	// 3. Request ID  →  add unique ID to context
+	// 4. CORS  →  handle cross-origin requests
+	// 5. Rate Limiting  →  throttle excessive requests
+	// 6. Logging  →  request/response logging
+	// 7. Timeout  →  per-request deadline enforcement
+	// 8. Router  →  actual request handling
+	// Trace → Recovery → RequestID → CORS → RateLimit → Logger → Timeout → Router
+	handler := middleware.NewTraceMiddleware(traceOpts...)(
 		middleware.RequestIDMiddleware(
-			middleware.NewTraceMiddleware(traceOpts...)(
+			middleware.RecoveryMiddleware()(
 				corsMiddleware(
 					rateLimiter.RateLimitMiddleware(
-						middleware.LoggerMiddleware()(
+						middleware.LoggerMiddleware(cfg.Logger)(
 							timeoutMiddleware(
 								rootMux,
 							),
