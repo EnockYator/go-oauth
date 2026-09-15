@@ -14,7 +14,7 @@ import (
 
 	"github.com/EnockYator/go-oauth/internal/config"
 	"github.com/EnockYator/go-oauth/internal/infrastructure/database/postgres"
-	"github.com/EnockYator/go-oauth/internal/infrastructure/observability/tracing"
+	"github.com/EnockYator/go-oauth/internal/infrastructure/observability/oteltracing"
 	httpserver "github.com/EnockYator/go-oauth/internal/interfaces/http"
 	"github.com/EnockYator/go-oauth/internal/interfaces/http/middleware"
 	"github.com/joho/godotenv"
@@ -24,7 +24,7 @@ const (
 	serviceName    = "go-oauth"
 	serviceVersion = "1.0.0"
 
-	defaultShutdownTimeout = 10 * time.Second
+	defaultShutdownTimeout = 30 * time.Second
 )
 
 func main() {
@@ -52,6 +52,10 @@ func run(logger *slog.Logger) error {
 	// ---------------------------------------------------------------------
 	// 1. Load development environment variables.
 	// ---------------------------------------------------------------------
+
+	appEnv := os.Getenv("APP_ENV")
+	logger = oteltracing.NewLogger(appEnv)
+	slog.SetDefault(logger)
 
 	if err := loadDevelopmentEnv(); err != nil {
 		return err
@@ -83,7 +87,7 @@ func run(logger *slog.Logger) error {
 	)
 
 	// ---------------------------------------------------------------------
-	// 3. Create application context.
+	// 3. Create application context (cancelled on SIGINT/SIGTERM).
 	// ---------------------------------------------------------------------
 
 	signalCtx, stop := signal.NotifyContext(
@@ -94,53 +98,67 @@ func run(logger *slog.Logger) error {
 	defer stop()
 
 	// ---------------------------------------------------------------------
-	// 4. Initialize tracing.
+	// 4. Initialize oteltracing.
+	//
+	//    Note: oteltracing must be initialized BEFORE the HTTP server so
+	//    that any instrumented dependency (otelhttp, otelpgx, ...)
+	//    resolves the global TracerProvider at construction time.
 	// ---------------------------------------------------------------------
 
-	tracerProvider, err := tracing.Init(
-		signalCtx,
-		tracing.Config{
-			ServiceName:     serviceName,
-			ServiceVersion:   serviceVersion,
-			DeploymentEnv:    cfg.App.AppEnv,
-			SamplingRatio:   0.10,
-			OTLPEndpoint:    "",
-			OTLPHeaders:     "",
-			ShutdownTimeout: 5 * time.Second,
-		},
-		logger,
-	)
-	if err != nil {
-		return errors.Join(
-			errors.New("initialize tracing"),
-			err,
-		)
+	oteltracingCfg := oteltracing.Config{
+		AppName:     serviceName,
+		AppVersion:  serviceVersion,
+		DeploymentEnv:   cfg.App.AppEnv,
+
+		Protocol: oteltracing.ProtocolGRPC, // or ProtocolHTTP
+		Endpoint: cfg.OTel.Endpoint,    // empty -> OTEL_EXPORTER_OTLP_ENDPOINT
+
+		// Production should always use TLS. Set Insecure=true only in
+		// local development or when the collector is on a trusted
+		// private network.
+		Insecure: cfg.App.AppEnv == "development",
+		TLSCAFile:   cfg.OTel.TLSCAFile,   // optional
+		TLSCertFile: cfg.OTel.TLSCertFile, // optional (mTLS)
+		TLSKeyFile:  cfg.OTel.TLSKeyFile,  // optional (mTLS)
+
+		Headers:     cfg.OTel.Headers, // e.g. {"x-honeycomb-team": "..."}
+		Compression: "gzip",
+
+		ExportTimeout:   10 * time.Second,
+		ShutdownTimeout: 5 * time.Second,
+
+		SamplingRatio: cfg.OTel.SampleRatio, // e.g. 0.10 in prod, 1.0 in dev
 	}
 
-	// Tracing must be shut down before the application exits so that
-	// pending spans have an opportunity to be exported.
+	tracerProvider, err := oteltracing.Init(signalCtx, oteltracingCfg, logger)
+	if err != nil {
+		return errors.Join(errors.New("initialize oteltracing"), err)
+	}
+
+	// oteltracing must outlive the HTTP server: flush spans AFTER the server
+	// stops serving requests.
 	defer func() {
 		shutdownCtx, cancel := context.WithTimeout(
 			context.Background(),
-			5*time.Second,
+			oteltracingCfg.ShutdownTimeout,
 		)
 		defer cancel()
 
-		if err := tracing.Shutdown(shutdownCtx, tracerProvider); err != nil {
+		if err := oteltracing.Shutdown(shutdownCtx, tracerProvider); err != nil {
 			logger.Error(
-				"failed to shutdown tracing",
+				"failed to shutdown oteltracing",
 				slog.Any("error", err),
 			)
 		}
 	}()
 
-	logger.Info("tracing initialized")
+	logger.InfoContext(signalCtx, "oteltracing initialized")
 
 	// ---------------------------------------------------------------------
 	// 5. Initialize database.
 	// ---------------------------------------------------------------------
 
-	db, err := postgres.New(cfg.Database)
+	db, err := postgres.New(signalCtx, cfg.Database)
 	if err != nil {
 		return errors.Join(
 			errors.New("initialize database"),
@@ -150,14 +168,7 @@ func run(logger *slog.Logger) error {
 
 	// Database cleanup belongs here because main owns the database
 	// lifecycle.
-	defer func() {
-		if err := db.Close(); err != nil {
-			logger.Error(
-				"failed to close database",
-				slog.Any("error", err),
-			)
-		}
-	}()
+	defer db.Close()
 
 	logger.Info("database initialized")
 
@@ -255,11 +266,9 @@ func run(logger *slog.Logger) error {
 	)
 	defer cancel()
 
-	logger.Info("application shutdown initiated")
-
 	if err := server.Shutdown(shutdownCtx); err != nil {
 		return errors.Join(
-			errors.New("shutdown HTTP server"),
+			errors.New("failed to shutdown HTTP server"),
 			err,
 		)
 	}
@@ -309,20 +318,4 @@ func loadDevelopmentEnv() error {
 	}
 
 	return nil
-}
-
-// shutdownSignal returns a useful signal description.
-//
-// signal.NotifyContext does not expose the actual signal directly, so this
-// function keeps logging simple and avoids maintaining another signal channel.
-func shutdownSignal(ctx context.Context) string {
-	if ctx.Err() == context.Canceled {
-		return "context canceled"
-	}
-
-	if ctx.Err() == context.DeadlineExceeded {
-		return "context deadline exceeded"
-	}
-
-	return "operating-system signal"
 }
