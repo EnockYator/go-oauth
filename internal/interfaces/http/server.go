@@ -2,7 +2,6 @@ package http
 
 import (
 	"context"
-	"database/sql"
 	"errors"
 	"log/slog"
 	"net/http"
@@ -11,6 +10,7 @@ import (
 
 	"github.com/EnockYator/go-oauth/internal/config"
 	"github.com/EnockYator/go-oauth/internal/interfaces/http/middleware"
+	"github.com/jackc/pgx/v5/pgxpool"
 	"go.opentelemetry.io/otel/trace"
 )
 
@@ -25,7 +25,7 @@ import (
 // Application lifecycle and OS signal handling belong to main.
 type Server struct {
 	cfg *config.Config
-	db  *sql.DB
+	db  *pgxpool.Pool
 
 	logger         *slog.Logger
 	tracerProvider trace.TracerProvider
@@ -58,7 +58,7 @@ type ServerOptions struct {
 // network socket.
 func NewServer(
 	cfg *config.Config,
-	db *sql.DB,
+	db *pgxpool.Pool,
 	opts ServerOptions,
 ) (*Server, error) {
 	if cfg == nil {
@@ -126,9 +126,10 @@ func (s *Server) Start() error {
 		"HTTP server configuration",
 		slog.String("address:", s.httpServer.Addr),
 		slog.String("environment", s.cfg.App.AppEnv),
-		slog.Duration("read_timeout", time.Duration(s.cfg.Server.ReadTimeout.Seconds())),
-		slog.Duration("write_timeout", time.Duration(s.cfg.Server.WriteTimeout.Seconds())),
-		slog.Duration("idle_timeout", time.Duration(s.cfg.Server.IdleTimeout.Seconds())),
+		slog.Duration("read_timeout", time.Duration(s.cfg.Server.ReadTimeout)),
+		slog.Duration("read_header_timeout", time.Duration(s.cfg.Server.ReadHeaderTimeout)),
+		slog.Duration("write_timeout", time.Duration(s.cfg.Server.WriteTimeout)),
+		slog.Duration("idle_timeout", time.Duration(s.cfg.Server.IdleTimeout)),
 	)
 
 	err := s.httpServer.ListenAndServe()
