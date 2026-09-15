@@ -91,10 +91,13 @@ func WithPublicEndpointFn() TraceMiddlewareOption {
 //	)(myHandler)
 func NewTraceMiddleware(opts ...TraceMiddlewareOption) func(http.Handler) http.Handler {
 	cfg := &TraceMiddlewareConfig{
-		serviceName:    "saas-photo-listing-platform", // default service name
+		serviceName:    "http.server", // default service name
 		tracerProvider: otel.GetTracerProvider(),
 		propagators:    otel.GetTextMapPropagator(),
 		spanNameFormatter: func(method string, r *http.Request) string {
+			if r.Pattern != "" {
+				return method + " " + r.Pattern
+			}
 			return method + " " + r.URL.Path
 		},
 	}
@@ -110,7 +113,7 @@ func NewTraceMiddleware(opts ...TraceMiddlewareOption) func(http.Handler) http.H
 	}
 	if cfg.filter != nil {
 		otelOpts = append(otelOpts, otelhttp.WithFilter(func(r *http.Request) bool {
-			return cfg.filter(r) // otelhttp's filter returns true to exclude from tracing
+			return !cfg.filter(r)
 		}))
 	}
 	if cfg.publicEndpoint {
