@@ -17,8 +17,8 @@ import (
 // @Produce json
 // @Success 200 {object} health.HealthResponse
 // @Failure 405 {object} response.APIErrorResponse
-// @Router /health [get]
-func Health(w http.ResponseWriter, r *http.Request) {
+// @Router /healthz [get]
+func Healthz(w http.ResponseWriter, r *http.Request) {
 	if r.Method != http.MethodGet {
 		response.WriteError(
 			w,
