@@ -44,7 +44,7 @@ const docTemplate = `{
                 }
             }
         },
-        "/health": {
+        "/healthz": {
             "get": {
                 "description": "Returns service health status",
                 "consumes": [
@@ -72,72 +72,37 @@ const docTemplate = `{
                     }
                 }
             }
-        },
-        "/health/live": {
-            "get": {
-                "description": "Returns service health live status",
-                "consumes": [
-                    "application/json"
-                ],
-                "produces": [
-                    "application/json"
-                ],
-                "tags": [
-                    "Health"
-                ],
-                "summary": "Health Live check",
-                "responses": {
-                    "200": {
-                        "description": "OK",
-                        "schema": {
-                            "$ref": "#/definitions/health.HealthResponse"
-                        }
-                    },
-                    "500": {
-                        "description": "Internal Server Error",
-                        "schema": {
-                            "type": "object",
-                            "additionalProperties": true
-                        }
-                    }
-                }
-            }
-        },
-        "/health/ready": {
-            "get": {
-                "description": "Returns database readiness status",
-                "consumes": [
-                    "application/json"
-                ],
-                "produces": [
-                    "application/json"
-                ],
-                "tags": [
-                    "Health"
-                ],
-                "summary": "Database readiness check",
-                "responses": {
-                    "200": {
-                        "description": "OK",
-                        "schema": {
-                            "$ref": "#/definitions/health.HealthResponse"
-                        }
-                    },
-                    "500": {
-                        "description": "Internal Server Error",
-                        "schema": {
-                            "type": "object",
-                            "additionalProperties": true
-                        }
-                    }
-                }
-            }
         }
     },
     "definitions": {
         "apperror.ErrorCode": {
             "type": "string",
             "enum": [
+                "AUTH_INVALID_CREDENTIALS",
+                "AUTH_TOKEN_EXPIRED",
+                "AUTH_TOKEN_INVALID",
+                "AUTH_TOKEN_MISSING",
+                "AUTH_SESSION_EXPIRED",
+                "AUTH_ACCOUNT_LOCKED",
+                "AUTH_MFA_REQUIRED",
+                "AUTH_PERMISSION_DENIED",
+                "AUTH_IP_ADRRESS_BLOCKED",
+                "USER_NOT_FOUND",
+                "USER_ALREADY_EXISTS",
+                "USER_EMAIL_INVALID",
+                "PAYMENT_FAILED",
+                "PAYMENT_DECLINED",
+                "PAYMENT_REQUIRED",
+                "BILLING_NOT_FOUND",
+                "SUBSCRIPTION_EXPIRED",
+                "SUBSCRIPTION_INVALID",
+                "STORAGE_LIMIT_REACHED",
+                "CLOUD_STORAGE_UNAVAILABLE",
+                "TENANT_NOT_FOUND",
+                "TENANT_INACTIVE",
+                "TENANT_ID_MISSING",
+                "TENANT_ID_INVALID",
+                "TENANT_ACCESS_DENIED",
                 "INTERNAL_SERVER_ERROR",
                 "BAD_REQUEST",
                 "METHOD_NOT_ALLOWED",
@@ -168,32 +133,7 @@ const docTemplate = `{
                 "REQUEST_TIMEOUT",
                 "CIRCUIT_BREAKER_OPEN",
                 "DEPENDENCY_FAILURE",
-                "SHUTDOWN_IN_PROGRESS",
-                "AUTH_INVALID_CREDENTIALS",
-                "AUTH_TOKEN_EXPIRED",
-                "AUTH_TOKEN_INVALID",
-                "AUTH_TOKEN_MISSING",
-                "AUTH_SESSION_EXPIRED",
-                "AUTH_ACCOUNT_LOCKED",
-                "AUTH_MFA_REQUIRED",
-                "AUTH_PERMISSION_DENIED",
-                "AUTH_IP_ADRRESS_BLOCKED",
-                "USER_NOT_FOUND",
-                "USER_ALREADY_EXISTS",
-                "USER_EMAIL_INVALID",
-                "PAYMENT_FAILED",
-                "PAYMENT_DECLINED",
-                "PAYMENT_REQUIRED",
-                "BILLING_NOT_FOUND",
-                "SUBSCRIPTION_EXPIRED",
-                "SUBSCRIPTION_INVALID",
-                "STORAGE_LIMIT_REACHED",
-                "CLOUD_STORAGE_UNAVAILABLE",
-                "TENANT_NOT_FOUND",
-                "TENANT_INACTIVE",
-                "TENANT_ID_MISSING",
-                "TENANT_ID_INVALID",
-                "TENANT_ACCESS_DENIED"
+                "SHUTDOWN_IN_PROGRESS"
             ],
             "x-enum-comments": {
                 "CodeAuthAccountLocked": "423",
@@ -254,6 +194,31 @@ const docTemplate = `{
                 "CodeValidationRequiredField": "422"
             },
             "x-enum-descriptions": [
+                "401",
+                "401",
+                "401",
+                "401",
+                "401",
+                "423",
+                "401",
+                "403",
+                "403",
+                "404",
+                "409",
+                "422",
+                "402",
+                "402",
+                "402",
+                "404",
+                "402",
+                "422",
+                "507",
+                "503",
+                "404",
+                "403",
+                "400",
+                "400",
+                "403",
                 "500",
                 "400",
                 "405",
@@ -284,34 +249,34 @@ const docTemplate = `{
                 "504 / 504",
                 "503",
                 "503",
-                "503",
-                "401",
-                "401",
-                "401",
-                "401",
-                "401",
-                "423",
-                "401",
-                "403",
-                "403",
-                "404",
-                "409",
-                "422",
-                "402",
-                "402",
-                "402",
-                "404",
-                "402",
-                "422",
-                "507",
-                "503",
-                "404",
-                "403",
-                "400",
-                "400",
-                "403"
+                "503"
             ],
             "x-enum-varnames": [
+                "CodeAuthInvalidCredentials",
+                "CodeAuthTokenExpired",
+                "CodeAuthTokenInvalid",
+                "CodeAuthTokenMissing",
+                "CodeAuthSessionExpired",
+                "CodeAuthAccountLocked",
+                "CodeAuthMFARequired",
+                "CodeAuthPermissionDenied",
+                "CodeIPBlocked",
+                "CodeUserNotFound",
+                "CodeUserAlreadyExists",
+                "CodeUserEmailInvalid",
+                "CodePaymentFailed",
+                "CodePaymentDeclined",
+                "CodePaymentRequired",
+                "CodeBillingNotFound",
+                "CodeSubscriptionExpired",
+                "CodeSubscriptionInvalid",
+                "CodeCloudStorageLimitReached",
+                "CodeCloudStorageUnavailable",
+                "CodeTenantNotFound",
+                "CodeTenantInactive",
+                "CodeTenantIDMissing",
+                "CodeTenantIDInvalid",
+                "CodeTenantAccessDenied",
                 "CodeInternalServerError",
                 "CodeBadRequest",
                 "CodeMethodNotAllowed",
@@ -342,32 +307,7 @@ const docTemplate = `{
                 "CodeRequestTimeout",
                 "CodeCircuitBreakerOpen",
                 "CodeDependencyFailure",
-                "CodeShutdownInProgress",
-                "CodeAuthInvalidCredentials",
-                "CodeAuthTokenExpired",
-                "CodeAuthTokenInvalid",
-                "CodeAuthTokenMissing",
-                "CodeAuthSessionExpired",
-                "CodeAuthAccountLocked",
-                "CodeAuthMFARequired",
-                "CodeAuthPermissionDenied",
-                "CodeIPBlocked",
-                "CodeUserNotFound",
-                "CodeUserAlreadyExists",
-                "CodeUserEmailInvalid",
-                "CodePaymentFailed",
-                "CodePaymentDeclined",
-                "CodePaymentRequired",
-                "CodeBillingNotFound",
-                "CodeSubscriptionExpired",
-                "CodeSubscriptionInvalid",
-                "CodeCloudStorageLimitReached",
-                "CodeCloudStorageUnavailable",
-                "CodeTenantNotFound",
-                "CodeTenantInactive",
-                "CodeTenantIDMissing",
-                "CodeTenantIDInvalid",
-                "CodeTenantAccessDenied"
+                "CodeShutdownInProgress"
             ]
         },
         "apperror.ErrorDetail": {
