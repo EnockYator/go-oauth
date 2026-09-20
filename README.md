@@ -1,6 +1,6 @@
 # go-oauth
 
-A production-ready OAuth 2.0 authentication service written in Go, supporting **Google** and **GitHub** as identity providers. Built on the standard `golang.org/x/oauth2` library with no framework lock-in.
+A Go authentication service that uses **OAuth 2.0 (authorization code flow)** via `golang.org/x/oauth2` to authenticate users through **GitHub** and **Google**, then issues **opaque server-side sessions** for the rest of the user's visit. No passwords, no JWT, no manual access-token or refresh-token management
 
 ---
 
@@ -8,14 +8,9 @@ A production-ready OAuth 2.0 authentication service written in Go, supporting **
 
 - [go-oauth](#go-oauth)
   - [Table of Contents](#table-of-contents)
+  - [Overview](#overview)
+  - [Identity Providers](#identity-providers)
   - [Features](#features)
-  - [Architecture](#architecture)
-    - [Architecture Diagram](#architecture-diagram)
-    - [Request Lifecycle](#request-lifecycle)
-      - [1. Login flow (/auth/google/login → /auth/google/callback)](#1-login-flow-authgooglelogin--authgooglecallback)
-      - [2. Authenticated request (GET /me)](#2-authenticated-request-get-me)
-    - [Minimal Schema](#minimal-schema)
-    - [Component Responsibilities](#component-responsibilities)
   - [Prerequisites](#prerequisites)
   - [Getting Started](#getting-started)
     - [1. Clone the repository](#1-clone-the-repository)
@@ -25,11 +20,12 @@ A production-ready OAuth 2.0 authentication service written in Go, supporting **
     - [3. Create the PostgreSQL database](#3-create-the-postgresql-database)
     - [4. Configure environment variables](#4-configure-environment-variables)
     - [5. Run the application](#5-run-the-application)
+  - [Component Responsibilities](#component-responsibilities)
   - [Configuration Reference](#configuration-reference)
+  - [Architecture](#architecture)
   - [API Endpoints](#api-endpoints)
-    - [Example: `/me` response](#example-me-response)
+    - [Example: `/api/me` response](#example-apime-response)
     - [Example: initiating login](#example-initiating-login)
-  - [OAuth Flow](#oauth-flow)
   - [Project Structure](#project-structure)
   - [Testing](#testing)
     - [Test doubles](#test-doubles)
@@ -42,193 +38,39 @@ A production-ready OAuth 2.0 authentication service written in Go, supporting **
 
 ---
 
-## Features
+## Overview
 
-- **Two providers** — Google and GitHub, with a pluggable provider interface for adding more.
-- **Standard library first** — uses `golang.org/x/oauth2` directly; no third-party auth frameworks.
-- **CSRF protection** — cryptographically random `state` parameter with server-side session validation.
-- **PKCE support** — enabled by default for both providers (`S256` code challenge).
-- **Secure session management** — signed, HTTP-only, `SameSite=Lax` cookies with configurable TTL.
-- **Account linking** — link multiple providers to a single user identity by verified email.
-- **Structured logging** — `slog` with trace correlation across the OAuth flow.
-- **OpenTelemetry tracing** — spans for each leg of the authorization code exchange.
-- **Graceful shutdown** — drains in-flight requests and flushes spans on `SIGTERM`.
-- **Fully configurable** — every provider, scope, and endpoint driven by environment variables.
+`go-oauth` implements the **OAuth 2.0 authorization code flow** using the official Go OAuth 2.0 client library. Users sign in through an external Identity Provider (GitHub or Google), the provider returns an authorization code, the server exchanges it for a token, fetches the user's profile, and then **immediately discards** the **OAuth tokens**.
+
+From that point on, the user's session is represented by an **opaque session ID** stored in a server-side session store (in this case PostgreSQL `sessions table`) and delivered to the browser as an HTTP-only cookie. There is no JWT parsing, no refresh-token rotation, and no client-side token handling.
 
 ---
 
-## Architecture
+## Identity Providers
 
-### Architecture Diagram
+| Provider | Authorization Endpoint |	User Info Source |
+|----------|------------------------|------------------|
+| **Google** | `accounts.google.com/o/oauth2/auth` |  `oauth2/google → Userinfo` |
+| **GitHub**	| `github.com/login/oauth/authorize` | `api.github.com/user` |
 
-```
-┌──────────┐     ┌──────────────────┐     ┌──────────────────────┐
-│  Client  │────▶│  go-oauth API    │────▶│  Google / GitHub     │
-│ (Browser)│◀────│  (this service)  │◀────│  OAuth 2.0 Endpoints │
-└──────────┘     └────────┬─────────┘     └──────────────────────┘
-                          │
-                          │  ① OAuth code exchange
-                          │  ② userinfo fetch
-                          │  ③ upsert user + create session
-                          │
-                          ▼
-              ┌───────────────────────────┐
-              │      PostgreSQL           │
-              │                           │
-              │  ┌─────────────────────┐  │
-              │  │  users              │  │
-              │  │  ─────              │  │
-              │  │  id (PK, UUID)      │  │
-              │  │  email (UNIQUE)     │  │
-              │  │  name               │  │
-              │  │  avatar_url         │  │
-              │  │  provider           │  │
-              │  │  provider_subject   │  │
-              │  │  created_at         │  │
-              │  │  updated_at         │  │
-              │  └─────────────────────┘  │
-              │                           │
-              │  ┌─────────────────────┐  │
-              │  │  sessions           │  │
-              │  │  ────────           │  │
-              │  │  token (PK)         │  │
-              │  │  user_id (FK→users) │  │
-              │  │  data (JSONB)       │  │
-              │  │  created_at         │  │
-              │  │  expires_at         │  │
-              │  │  last_seen          │  │
-              │  └─────────────────────┘  │
-              └───────────────────────────┘
-                          ▲
-                          │
-                          │  Cleanup goroutine
-                          │  DELETE FROM sessions
-                          │  WHERE expires_at < NOW()
-                          │
-              ┌───────────┴───────────┐
-              │  In-process ticker    │
-              │  (every 5 min)        │
-              └───────────────────────┘
-```
+Both are configured through `oauth2.Config` from `golang.org/x/oauth2`.
 
-The service performs the full **Authorization Code flow** server-side. The browser never sees access tokens; it only receives a signed session cookie.
+---
 
-### Request Lifecycle
+## Features
 
-#### 1. Login flow (/auth/google/login → /auth/google/callback)
-
-```text
-Browser                go-oauth                 PostgreSQL          Google
-   │                       │                        │                  │
-   │ GET /auth/google/login│                        │                  │
-   ├──────────────────────▶│                        │                  │
-   │                       │ generate state + PKCE  │                  │
-   │                       │ store in temp session  │                  │
-   │  302 to consent URL   │                        │                  │
-   │◀──────────────────────┤                        │                  │
-   │                       │                        │                  │
-   │ user consents         │                        │                  │
-   ├────────────────────────────────────────────────┼─────────────────▶│
-   │                       │                        │                  │
-   │  302 ?code=...&state= │                        │                  │
-   │◀───────────────────────────────────────────────┼──────────────────│
-   │                       │                        │                  │
-   │ GET /callback         │                        │                  │
-   ├──────────────────────▶│                        │                  │
-   │                       │ verify state           │                  │
-   │                       │ exchange code ─────────┼─────────────────▶│
-   │                       │◀───────── access token ┼──────────────────│
-   │                       │ fetch userinfo ────────┼─────────────────▶│
-   │                       │◀───────── user profile ┼──────────────────│
-   │                       │                        │                  │
-   │                       │ INSERT/UPDATE users ──▶│                  │
-   │                       │◀───────── user.id ─────│                  │
-   │                       │                        │                  │
-   │                       │ generate session token │                  │
-   │                       │ INSERT sessions ──────▶│                  │
-   │                       │◀───────── ok ──────────│                  │
-   │                       │                        │                  │
-   │ Set-Cookie: token     │                        │                  │
-   │◀──────────────────────┤                        │                  │
-   │  302 to /me           │                        │                  │
-   │◀──────────────────────┤                        │                  │
-```
-   
-
-#### 2. Authenticated request (GET /me)
-
-```text
-Browser                go-oauth                 PostgreSQL
-   │                       │                        │
-   │ GET /me               │                        │
-   │ Cookie: token=abc...  │                        │
-   ├──────────────────────▶│                        │
-   │                       │ SELECT * FROM sessions │
-   │                       │ WHERE token = $1 ─────▶│
-   │                       │◀───────── session row ─│
-   │                       │                        │
-   │                       │ SELECT * FROM users    │
-   │                       │ WHERE id = $1 ────────▶│
-   │                       │◀───────── user row ────│
-   │                       │                        │
-   │ 200 OK { user JSON }  │                        │
-   │◀──────────────────────┤                        │
-```
-
-One cookie → one indexed lookup in `sessions` → one indexed lookup in `users`. No JWT verification, no cryptographic operations, no trust in the browser.
-
-### Minimal Schema
-
-`migrations/001_create_extensions.sql`
-
-```sql
-CREATE EXTENSION IF NOT EXISTS "pgcrypto";
-```
-
-`migrations/002_create_users.sql`
-
-```sql
-CREATE TABLE IF NOT EXISTS users (
-    id                UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-    email             TEXT NOT NULL UNIQUE,
-    name              TEXT NOT NULL,
-    avatar_url        TEXT,
-    provider          TEXT NOT NULL,
-    provider_subject  TEXT NOT NULL,
-    created_at        TIMESTAMPTZ NOT NULL DEFAULT NOW(),
-    updated_at        TIMESTAMPTZ NOT NULL DEFAULT NOW(),
-    CONSTRAINT users_provider_subject_unique UNIQUE (provider, provider_subject)
-);
-
-CREATE INDEX IF NOT EXISTS users_email_idx ON users (LOWER(email));
-```
-
-The `UNIQUE (provider, provider_subject)` constraint is the account-linking key: when the same Google `sub` returns, you find the existing user instead of creating a duplicate.
-
-`migrations/003_create_sessions.sql`
-
-```sql
-CREATE TABLE IF NOT EXISTS sessions (
-    token      TEXT PRIMARY KEY,
-    user_id    UUID NOT NULL REFERENCES users(id) ON DELETE CASCADE,
-    data       JSONB NOT NULL DEFAULT '{}',
-    created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
-    expires_at TIMESTAMPTZ NOT NULL,
-    last_seen  TIMESTAMPTZ NOT NULL DEFAULT NOW()
-);
-
-CREATE INDEX IF NOT EXISTS sessions_expires_at_idx ON sessions (expires_at);
-CREATE INDEX IF NOT EXISTS sessions_user_id_idx    ON sessions (user_id);
-```
-
-### Component Responsibilities
-
-| Component | Owns | Does not own |
-|-----------|------|--------------|
-| Browser | The session cookie(opaque token) | Any session data, claims, or user info |
-| go-oauth API | Business logic, OAuth flow, session issuance, token generation | Persistence details (delegated to `*store` interfaces) |
-| PostgreSQL | User records, session records, provider identity mappings | Validations, authorization, decisions |
-| Google / GitHub | Identity verification, access tokens for their APIS | session / user record, authorization |
+- **Google & GitHub providers** — registered via `oauth2.Config`
+- **Extensibility** - uses a pluggable provider interface for adding more authentication providers.
+- **Standard library approach** — uses `golang.org/x/oauth2` directly; no third-party auth frameworks.
+- **CSRF protection** — cryptographically random `state` parameter with server-side session validation.
+- **PKCE support** — enabled by default for both providers (`S256` code challenge).
+- **Server-side session store** — stores sessions in PostgreSQL.
+- **Secure session management** — signed, HTTP-only, `SameSite=Lax` cookies with configurable TTL.
+- **Account linking** — link multiple providers to a single user identity by verified email.
+- **Logout** — simply deletes the session record and clears the cookie
+- **Structured logging** — `slog` with trace correlation across the OAuth flow.
+- **OpenTelemetry tracing** — spans for each leg of the authorization code exchange.
+- **Graceful shutdown** — drains in-flight requests and flushes spans on `SIGTERM`.
 
 ---
 
@@ -361,6 +203,17 @@ The server starts on `http://localhost:8080`. Open your browser and navigate to:
 
 ---
 
+## Component Responsibilities
+
+| Component | Owns | Does not own |
+|-----------|------|--------------|
+| Browser | The session cookie(opaque token) | Any session data, claims, or user info |
+| go-oauth API | Business logic, OAuth flow, session issuance, token generation | Persistence details (delegated to `*store` interfaces) |
+| PostgreSQL | User records, session records, provider identity mappings | Validations, authorization, decisions |
+| Google / GitHub | Identity verification, access tokens for their APIS | session / user record, authorization |
+
+---
+
 ## Configuration Reference
 
 | Variable | Description |
@@ -401,6 +254,12 @@ The server starts on `http://localhost:8080`. Open your browser and navigate to:
 
 ---
 
+## Architecture
+
+Read more on [Architecture](ARCHITECTURE.md)
+
+---
+
 ## API Endpoints
 
 | Method | Path | Description |
@@ -414,7 +273,7 @@ The server starts on `http://localhost:8080`. Open your browser and navigate to:
 
 Supported `{provider}` values: `google`, `github`.
 
-### Example: `/me` response
+### Example: `/api/me` response
 
 ```json
 {
@@ -435,41 +294,6 @@ Supported `{provider}` values: `google`, `github`.
 # Redirects the browser to Google's consent screen.
 curl -i http://localhost:8080/auth/google/login
 ```
-
----
-
-## OAuth Flow
-
-```
-Browser          go-oauth               Provider
-   │                 │                     │
-   │ GET /auth/google/login                │
-   ├────────────────▶│                     │
-   │                 │ generate state+PKCE │
-   │                 │ store in session    │
-   │  302 to provider consent URL          │
-   │◀────────────────┤                     │
-   │                                       │
-   │ User consents                         │
-   ├───────────────────────────────────────▶
-   │                                       │
-   │  302 to /auth/google/callback?code=...&state=...
-   │◀───────────────────────────────────────
-   │                 │                     │
-   │ GET callback    │                     │
-   ├────────────────▶│                     │
-   │                 │ verify state        │
-   │                 │ exchange code ──────▶
-   │                 │◀────── access token │
-   │                 │ fetch userinfo ─────▶
-   │                 │◀────── user profile │
-   │                 │ upsert user         │
-   │                 │ create session      │
-   │  302 to /me     │                     │
-   │◀────────────────┤                     │
-```
-
-Each step between `go-oauth` and the provider is wrapped in an OpenTelemetry span named `auth.{provider}.exchange` or `auth.{provider}.userinfo`, so a full trace is visible in your observability backend.
 
 ---
 
@@ -578,11 +402,9 @@ go-oauth/
 └── tmp
     ├── build-errors.log
     └── main
-
-37 directories, 64 files
 ```
 
-The layering follows strict separation of concerns: **domain** (`internal/user`, `internal/auth`) knows nothing about HTTP or OAuth libraries; **infrastructure** (`internal/session`) knows nothing about business rules; **interface** (`internal/http`) translates between HTTP and the domain.
+The layering follows strict separation of concerns: **domain** (`internal/domain/user`, `internal/domain/auth`) knows nothing about HTTP or OAuth libraries; **infrastructure** (`internal/infrastructure`) knows nothing about business rules; **interface** (`internal/interfaces/http`) translates between HTTP and the domain.
 
 ---
 
@@ -679,14 +501,14 @@ You are using cookie sessions (no `REDIS_URL`). This is expected — cookie sess
 
 1. Fork the repository and create a feature branch.
 2. Follow the existing layering: domain → application → infrastructure → interface.
-3. Every new provider must implement the `auth.Provider` interface and register itself in `internal/auth/registry.go`.
+3. Every new provider must implement the `auth.Provider` interface and register itself in `internal/domain/auth/registry.go`.
 4. Add unit tests using the `httptest`-based stubs. No live network calls in `go test`.
 5. Run `go vet ./...` and `golangci-lint run` before opening a pull request.
 6. Update this README if you add configuration variables or endpoints.
 
 ### Adding a new provider
 
-Create `internal/auth/yourprovider.go`:
+Create `internal/domain/auth/your_provider.go`:
 
 ```go
 type YourProvider struct {
@@ -706,7 +528,7 @@ func (p *YourProvider) AuthCodeURL(state, verifier string) string {
 // Exchange and UserInfo as above.
 ```
 
-Register it in `registry.go` and add the corresponding environment variables to `config.go`. That is the entire surface area.
+Register it in `internal/domain/auth/registry.go` and add the corresponding environment variables to `.env` and the getters/loaders in `internal/config` directory.
 
 ---
 
