@@ -34,3 +34,6 @@ go.work.sum
 
 # Air tmp files
 tmp/
+
+# Swagger files
+docs/
