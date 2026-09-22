@@ -37,7 +37,7 @@ func Root(w http.ResponseWriter, r *http.Request) {
 	response.WriteResponse(
 		w,
 		http.StatusOK,
-		root.RootResponse{
+		root.RootDTO{
 			AppName: os.Getenv("APP_NAME"),
 			AppVersion: os.Getenv("APP_VERSION"),
 			AppEnv: os.Getenv("APP_ENV"),

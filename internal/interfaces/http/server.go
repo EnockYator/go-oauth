@@ -8,7 +8,7 @@ import (
 	"strconv"
 	"time"
 
-	"github.com/EnockYator/go-oauth/internal/config"
+	"github.com/EnockYator/go-oauth/internal/infrastructure/config"
 	"github.com/EnockYator/go-oauth/internal/interfaces/http/middleware"
 	"github.com/jackc/pgx/v5/pgxpool"
 	"go.opentelemetry.io/otel/trace"
