@@ -7,7 +7,7 @@ import (
 
 	"github.com/jackc/pgx/v5/pgxpool"
 
-	"github.com/EnockYator/go-oauth/internal/config"
+	"github.com/EnockYator/go-oauth/internal/infrastructure/config"
 )
 
 func New(ctx context.Context, cfg config.DatabaseConfig) (*pgxpool.Pool, error) {

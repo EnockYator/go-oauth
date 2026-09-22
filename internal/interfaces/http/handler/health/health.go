@@ -36,7 +36,7 @@ func Healthz(w http.ResponseWriter, r *http.Request) {
 	response.WriteResponse(
 		w,
 		http.StatusOK,
-		health.HealthResponse{
+		health.HealthDTO{
 			Status:      "ok",
 			Application: "go-oauth",
 		},

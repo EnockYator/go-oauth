@@ -12,7 +12,7 @@ import (
 
 	_ "github.com/EnockYator/go-oauth/docs"
 
-	"github.com/EnockYator/go-oauth/internal/config"
+	"github.com/EnockYator/go-oauth/internal/infrastructure/config"
 	"github.com/EnockYator/go-oauth/internal/infrastructure/database/postgres"
 	"github.com/EnockYator/go-oauth/internal/infrastructure/observability/oteltracing"
 	httpserver "github.com/EnockYator/go-oauth/internal/interfaces/http"

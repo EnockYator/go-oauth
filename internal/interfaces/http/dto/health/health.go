@@ -1,6 +1,6 @@
 package health
 
-type HealthResponse struct {
+type HealthDTO struct {
 	Status      string `json:"status"`
 	Application string `json:"application"`
 }

@@ -1,6 +1,6 @@
 package root
 
-type RootResponse struct {
+type RootDTO struct {
 	AppName string `json:"app_name"`
 	AppVersion string `json:"app_version"`
 	AppEnv string `json:"app_env"`

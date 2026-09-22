@@ -7,7 +7,7 @@ import (
 	"strings"
 	"time"
 
-	"github.com/EnockYator/go-oauth/internal/domain/auth/infrastructure/jwt"
+	"github.com/EnockYator/go-oauth/internal/modules/auth/infrastructure/jwt"
 	"github.com/EnockYator/go-oauth/internal/interfaces/http/handler/health"
 	"github.com/EnockYator/go-oauth/internal/interfaces/http/handler/root"
 	"github.com/EnockYator/go-oauth/internal/interfaces/http/middleware"
