@@ -5,9 +5,9 @@ import (
 	"net/http"
 	"strings"
 
+	"github.com/EnockYator/go-oauth/internal/interfaces/http/response"
 	auth "github.com/EnockYator/go-oauth/internal/modules/auth/domain"
 	"github.com/EnockYator/go-oauth/internal/modules/auth/infrastructure/jwt"
-	"github.com/EnockYator/go-oauth/internal/interfaces/http/response"
 	"github.com/EnockYator/go-oauth/internal/shared/apperror"
 	"github.com/EnockYator/go-oauth/internal/shared/requestcontext"
 

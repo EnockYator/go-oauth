@@ -38,10 +38,10 @@ func Root(w http.ResponseWriter, r *http.Request) {
 		w,
 		http.StatusOK,
 		root.RootDTO{
-			AppName: os.Getenv("APP_NAME"),
+			AppName:    os.Getenv("APP_NAME"),
 			AppVersion: os.Getenv("APP_VERSION"),
-			AppEnv: os.Getenv("APP_ENV"),
-			Status:      "ok",
+			AppEnv:     os.Getenv("APP_ENV"),
+			Status:     "ok",
 		},
 	)
 }

@@ -7,10 +7,10 @@ import (
 	"strings"
 	"time"
 
-	"github.com/EnockYator/go-oauth/internal/modules/auth/infrastructure/jwt"
 	"github.com/EnockYator/go-oauth/internal/interfaces/http/handler/health"
 	"github.com/EnockYator/go-oauth/internal/interfaces/http/handler/root"
 	"github.com/EnockYator/go-oauth/internal/interfaces/http/middleware"
+	"github.com/EnockYator/go-oauth/internal/modules/auth/infrastructure/jwt"
 	"github.com/jackc/pgx/v5/pgxpool"
 
 	httpSwagger "github.com/swaggo/http-swagger"
@@ -20,7 +20,7 @@ import (
 // RouterConfig contains everything required to construct the HTTP router.
 type RouterConfig struct {
 	DB             *pgxpool.Pool
-	Logger *slog.Logger
+	Logger         *slog.Logger
 	JWTValidator   jwt.TokenValidator
 	TracerProvider trace.TracerProvider
 	CORS           middleware.CORSConfig
@@ -68,7 +68,7 @@ func NewRouter(cfg RouterConfig) (*Router, error) {
 
 	// Public routes (no authentication required)
 	publicMux := http.NewServeMux()
-	
+
 	// Exact-match root: only matches "GET /", nothing else.
 	publicMux.HandleFunc("GET /{$}", root.Root)
 	// Explicit health and swagger routes.

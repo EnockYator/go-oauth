@@ -26,9 +26,9 @@ const (
 // batch span processor falls back to the OTel SDK defaults.
 type Config struct {
 	// ---- Service identity --------------------------------------------
-	AppName    string
-	AppVersion string
-	DeploymentEnv  string
+	AppName       string
+	AppVersion    string
+	DeploymentEnv string
 
 	// ---- Transport ---------------------------------------------------
 	Protocol Protocol // Defaults to ProtocolGRPC.

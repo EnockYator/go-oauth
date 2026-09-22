@@ -9,7 +9,7 @@ import (
 
 // getEnvStr gets the string value of the evironment variable that matches the key.
 // If the string is empty, it returns the default value passed.
-func getEnvStr(key, defaultValue string) (string)  {
+func getEnvStr(key, defaultValue string) string {
 	if value := os.Getenv(key); value != "" {
 		return value
 	}
@@ -18,7 +18,7 @@ func getEnvStr(key, defaultValue string) (string)  {
 
 // getEnvInt gets the interger value of the evironment variable that matches the key.
 // If the value is 0, it returns the default value passed.
-func getEnvInt(key string, defaultValue int) (int)  {
+func getEnvInt(key string, defaultValue int) int {
 	if value := os.Getenv(key); value != "" {
 		i, err := strconv.Atoi(value)
 		if err != nil {
@@ -35,7 +35,7 @@ func getEnvInt(key string, defaultValue int) (int)  {
 
 // getEnvInt gets the interger value of the evironment variable that matches the key.
 // If the value is 0, it returns the default value passed.
-func getEnvFloat64(key string, defaultValue float64) float64  {
+func getEnvFloat64(key string, defaultValue float64) float64 {
 	if value := os.Getenv(key); value != "" {
 		f, err := strconv.ParseFloat(value, 64)
 		if err != nil {
@@ -52,7 +52,7 @@ func getEnvFloat64(key string, defaultValue float64) float64  {
 
 // getEnvDuration gets the duration value of the evironment variable that matches the key
 // If the duration is not set, it returns the default value passed.
-func getEnvDuration(key string, defaultValue time.Duration) (time.Duration)  {
+func getEnvDuration(key string, defaultValue time.Duration) time.Duration {
 	if value := os.Getenv(key); value != "" {
 		d, err := time.ParseDuration(value)
 		if err != nil {
@@ -63,5 +63,5 @@ func getEnvDuration(key string, defaultValue time.Duration) (time.Duration)  {
 		}
 		return d
 	}
-	return  defaultValue
+	return defaultValue
 }
