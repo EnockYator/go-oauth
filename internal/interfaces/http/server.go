@@ -93,7 +93,7 @@ func NewServer(
 
 	httpServer := &http.Server{
 		Addr:              ":" + port,
-		Handler:            router.Handler(),
+		Handler:           router.Handler(),
 		ReadTimeout:       cfg.Server.ReadTimeout * time.Second,
 		ReadHeaderTimeout: cfg.Server.ReadTimeout * time.Second,
 		WriteTimeout:      cfg.Server.WriteTimeout * time.Second,

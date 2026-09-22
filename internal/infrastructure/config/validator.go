@@ -15,15 +15,15 @@ var validate = validator.New()
 func ValidateConfig(cfg Config) error {
 	if err := validate.Struct(cfg); err != nil {
 		var validationErrors validator.ValidationErrors
-		
+
 		if !errors.As(err, &validationErrors) {
 			slog.Error(
 				"app config validation error",
-			slog.Any("env_validation", err))
+				slog.Any("env_validation", err))
 			return fmt.Errorf("validate config: %w", err)
 		}
 
-	return formatValidationErrors(validationErrors)
+		return formatValidationErrors(validationErrors)
 	}
 	return nil
 }
@@ -33,7 +33,7 @@ func formatValidationErrors(errs validator.ValidationErrors) error {
 
 	for _, err := range errs {
 		field := err.Namespace()
-		
+
 		switch err.Tag() {
 		case "required":
 			messages = append(

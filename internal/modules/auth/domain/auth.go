@@ -9,24 +9,24 @@ import (
 )
 
 type Claims struct {
-	UserID string
+	UserID   string
 	TenantID string
-	Roles []string
+	Roles    []string
 }
 
 type CreateSessionParams struct {
-    IDHash    string
-    UserID    uuid.UUID
-    ExpiresAt time.Time
-    Metadata  json.RawMessage
+	IDHash    string
+	UserID    uuid.UUID
+	ExpiresAt time.Time
+	Metadata  json.RawMessage
 }
 
 type TouchSessionParams struct {
-    IDHash   string
-    Interval pgtype.Interval
+	IDHash   string
+	Interval pgtype.Interval
 }
 
 type RevokeUserSessionsExceptParams struct {
-    UserID uuid.UUID
-    IDHash string
+	UserID uuid.UUID
+	IDHash string
 }

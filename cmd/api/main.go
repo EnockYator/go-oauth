@@ -106,17 +106,17 @@ func run(logger *slog.Logger) error {
 	// ---------------------------------------------------------------------
 
 	oteltracingCfg := oteltracing.Config{
-		AppName:     serviceName,
-		AppVersion:  serviceVersion,
-		DeploymentEnv:   cfg.App.AppEnv,
+		AppName:       serviceName,
+		AppVersion:    serviceVersion,
+		DeploymentEnv: cfg.App.AppEnv,
 
 		Protocol: oteltracing.ProtocolGRPC, // or ProtocolHTTP
-		Endpoint: cfg.OTel.Endpoint,    // empty -> OTEL_EXPORTER_OTLP_ENDPOINT
+		Endpoint: cfg.OTel.Endpoint,        // empty -> OTEL_EXPORTER_OTLP_ENDPOINT
 
 		// Production should always use TLS. Set Insecure=true only in
 		// local development or when the collector is on a trusted
 		// private network.
-		Insecure: cfg.App.AppEnv == "development",
+		Insecure:    cfg.App.AppEnv == "development",
 		TLSCAFile:   cfg.OTel.TLSCAFile,   // optional
 		TLSCertFile: cfg.OTel.TLSCertFile, // optional (mTLS)
 		TLSKeyFile:  cfg.OTel.TLSKeyFile,  // optional (mTLS)
@@ -180,7 +180,7 @@ func run(logger *slog.Logger) error {
 		cfg,
 		db,
 		httpserver.ServerOptions{
-			Logger:         logger,
+			Logger: logger,
 			// JWTValidator:   tokenValidator,
 			TracerProvider: tracerProvider,
 
