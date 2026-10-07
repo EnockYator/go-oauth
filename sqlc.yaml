@@ -5,81 +5,131 @@
     sql:
 
     ##########################################
-    # # Auth Domain
+    # # Auth module
     ##########################################
     
     #  sessions table
       - engine: "postgresql"
         schema: "internal/infrastructure/database/postgres/migrations/*.sql"
-        queries: "internal/domain/auth/infrastructure/database/queries/sessions.sql"
+        queries: "internal/modules/auth/infrastructure/database/queries/sessions.sql"
         gen:
           go:
             package: "sqlc"
-            out: "internal/domain/auth/infrastructure/database/repository/sqlc"
+            out: "internal/modules/auth/infrastructure/database/repository/sqlc"
+            sql_package: "pgx/v5"
             emit_json_tags: true
             emit_prepared_queries: true
             emit_empty_slices: true
+            emit_pointers_for_null_types: true
             overrides:
-              - db_type: "uuid"
-                go_type: "github.com/google/uuid.UUID"
-              - db_type: "uuid"
-                nullable: true
-                go_type:
-                  type: "uuid.UUID"
-                  import: "github.com/google/uuid"
-                  pointer: true
-              - db_type: "timestamptz"
-                go_type: "time.Time"
-              - db_type: "timestamptz"
-                nullable: true
-                go_type:
-                  type: "time.Time"
-                  pointer: true
-              - db_type: "jsonb"
-                go_type: "encoding/json.RawMessage"
-              - db_type: "jsonb"
-                nullable: true
-                go_type:
-                  type: "json.RawMessage"
-                  import: "encoding/json"
-                  pointer: true
+            - db_type: "uuid"
+              go_type: "string"
+            # Nullable timestampz
+            - db_type: "timestamptz"
+              nullable: true
+              go_type: 
+                import: "time"
+                type: "Time"
+                pointer: true
+            # Non-nullable timestampz
+            - db_type: "timestamptz"
+              nullable: false
+              go_type: 
+                import: "time"
+                type: "Time"
+
+            - db_type: "text"
+              go_type: "string"
+            - db_type: "varchar"
+              go_type: "string"
+            - db_type: "boolean"
+              go_type: "bool"
+            # pg_catalog.jsonb (non-nullable and nullable)
+            - db_type: "pg_catalog.jsonb"
+              nullable: true
+              go_type: 
+                import: "encoding/json"
+                type: "RawMessage"
+                pointer: true
+            - db_type: "pg_catalog.jsonb"
+              go_type: 
+                import: "encoding/json"
+                type: "RawMessage"
+            # pg_catalog.json (non-nullable and nullable)
+            - db_type: "pg_catalog.json"
+              nullable: true
+              go_type: 
+                import: "encoding/json"
+                type: "RawMessage"
+                pointer: true
+            - db_type: "pg_catalog.json"
+              go_type: 
+                import: "encoding/json"
+                type: "RawMessage"
+            # bare jsonb (non-nullable and nullable)
+            - db_type: "jsonb"
+              nullable: true
+              go_type: 
+                import: "encoding/json"
+                type: "RawMessage"
+                pointer: true
+            - db_type: "jsonb"
+              go_type: 
+                import: "encoding/json"
+                type: "RawMessage"
+            # bare json (non-nullable and nullable)
+            - db_type: "json"
+              nullable: true
+              go_type: 
+                import: "encoding/json"
+                type: "RawMessage"
+                pointer: true
+            - db_type: "json"
+              go_type: 
+                import: "encoding/json"
+                type: "RawMessage"
+
 
     ##########################################
-    # # User Domain
+    # # User module
     ##########################################
     
       #  Users table
       - engine: "postgresql"
         schema: "internal/infrastructure/database/postgres/migrations/*.sql"
-        queries: "internal/domain/user/infrastructure/database/queries/users.sql"
+        queries: "internal/modules/user/infrastructure/database/queries/users.sql"
         gen:
           go:
             package: "sqlc"
-            out: "internal/domain/user/infrastructure/database/repository/sqlc"
+            out: "internal/modules/user/infrastructure/database/repository/sqlc"
+            sql_package: "pgx/v5"
             emit_json_tags: true
             emit_prepared_queries: true
             emit_empty_slices: true
+            emit_pointers_for_null_types: true
             overrides:
-              - db_type: "uuid"
-                go_type: "github.com/google/uuid.UUID"
-              - db_type: "uuid"
-                nullable: true
-                go_type:
-                  type: "uuid.UUID"
-                  import: "github.com/google/uuid"
-                  pointer: true
-              - db_type: "timestamptz"
-                go_type: "time.Time"
-              - db_type: "timestamptz"
-                nullable: true
-                go_type:
-                  type: "time.Time"
-                  pointer: true
-              - db_type: "jsonb"
-                go_type: "encoding/json.RawMessage"
-              - db_type: "jsonb"
-                nullable: true
-                go_type:
-                  type: "json.RawMessage"
-                  import: "encoding/json"
-                  pointer: true
+            - db_type: "uuid"
+              go_type: "string"
+            # Nullable timestampz
+            - db_type: "timestamptz"
+              nullable: true
+              go_type: 
+                import: "time"
+                type: "Time"
+                pointer: true
+            
+            # Non-nullable timestampz
+            - db_type: "timestamptz"
+              nullable: false
+              go_type: 
+                import: "time"
+                type: "Time"
+                
+            - db_type: "text"
+              go_type: "string"
+            - db_type: "varchar"
+              go_type: "string"
+            - db_type: "boolean"
+              go_type: "bool"
+            - db_type: "jsonb"
+              go_type: "encoding/json.RawMessage"
