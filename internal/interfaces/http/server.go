@@ -9,8 +9,9 @@ import (
 	"time"
 
 	"github.com/EnockYator/go-oauth/internal/infrastructure/config"
+	"github.com/EnockYator/go-oauth/internal/interfaces/http/cookie"
+	"github.com/EnockYator/go-oauth/internal/interfaces/http/handler/auth"
 	"github.com/EnockYator/go-oauth/internal/interfaces/http/middleware"
-	"github.com/jackc/pgx/v5/pgxpool"
 	"go.opentelemetry.io/otel/trace"
 )
 
@@ -25,14 +26,8 @@ import (
 // Application lifecycle and OS signal handling belong to main.
 type Server struct {
 	cfg *config.Config
-	db  *pgxpool.Pool
 
-	logger         *slog.Logger
-	tracerProvider trace.TracerProvider
-
-	cors           middleware.CORSConfig
-	rateLimiter    middleware.RateLimiterConfig
-	requestTimeout time.Duration
+	logger *slog.Logger
 
 	httpServer *http.Server
 	router     *Router
@@ -58,15 +53,14 @@ type ServerOptions struct {
 // network socket.
 func NewServer(
 	cfg *config.Config,
-	db *pgxpool.Pool,
 	opts ServerOptions,
+	authHandler *auth.Handler,
+	validateSession middleware.SessionValidator,
+	sessionCookieCfg cookie.SessionConfig,
+
 ) (*Server, error) {
 	if cfg == nil {
 		return nil, errors.New("configuration must not be nil")
-	}
-
-	if db == nil {
-		return nil, errors.New("database must not be nil")
 	}
 
 	logger := opts.Logger
@@ -75,12 +69,16 @@ func NewServer(
 	}
 
 	router, err := NewRouter(RouterConfig{
-		DB:             db,
 		Logger:         logger,
 		TracerProvider: opts.TracerProvider,
 		CORS:           opts.CORS,
 		RateLimiter:    opts.RateLimiter,
 		RequestTimeout: opts.RequestTimeout,
+
+		// Auth wiring
+		AuthHandler:         authHandler,
+		SessionValidator:    validateSession,
+		SessionCookieConfig: sessionCookieCfg,
 	})
 	if err != nil {
 		return nil, errors.Join(
@@ -94,21 +92,15 @@ func NewServer(
 	httpServer := &http.Server{
 		Addr:              ":" + port,
 		Handler:           router.Handler(),
-		ReadTimeout:       cfg.Server.ReadTimeout * time.Second,
-		ReadHeaderTimeout: cfg.Server.ReadTimeout * time.Second,
-		WriteTimeout:      cfg.Server.WriteTimeout * time.Second,
-		IdleTimeout:       cfg.Server.IdleTimeout * time.Second,
+		ReadTimeout:       cfg.Server.ReadTimeout,
+		ReadHeaderTimeout: cfg.Server.ReadHeaderTimeout,
+		WriteTimeout:      cfg.Server.WriteTimeout,
+		IdleTimeout:       cfg.Server.IdleTimeout,
 	}
 
 	return &Server{
-		cfg:            cfg,
-		db:             db,
-		logger:         logger,
-		tracerProvider: opts.TracerProvider,
-
-		cors:           opts.CORS,
-		rateLimiter:    opts.RateLimiter,
-		requestTimeout: opts.RequestTimeout,
+		cfg:    cfg,
+		logger: logger,
 
 		httpServer: httpServer,
 		router:     router,
@@ -124,7 +116,7 @@ func (s *Server) Start() error {
 	s.logger.Info("HTTP server starting")
 	s.logger.Info(
 		"HTTP server configuration",
-		slog.String("address:", s.httpServer.Addr),
+		slog.String("address", s.httpServer.Addr),
 		slog.String("environment", s.cfg.App.AppEnv),
 		slog.Duration("read_timeout", time.Duration(s.cfg.Server.ReadTimeout)),
 		slog.Duration("read_header_timeout", time.Duration(s.cfg.Server.ReadHeaderTimeout)),
