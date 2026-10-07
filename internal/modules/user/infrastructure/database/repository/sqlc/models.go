@@ -5,16 +5,13 @@
 package sqlc
 
 import (
-	"database/sql"
 	"encoding/json"
 	"time"
-
-	"github.com/google/uuid"
 )
 
 type Session struct {
 	IDHash    string          `json:"id_hash"`
-	UserID    uuid.UUID       `json:"user_id"`
+	UserID    string          `json:"user_id"`
 	CreatedAt time.Time       `json:"created_at"`
 	ExpiresAt time.Time       `json:"expires_at"`
 	RevokedAt *time.Time      `json:"revoked_at"`
@@ -23,12 +20,12 @@ type Session struct {
 }
 
 type User struct {
-	ID              uuid.UUID      `json:"id"`
-	Email           string         `json:"email"`
-	Name            string         `json:"name"`
-	AvatarUrl       sql.NullString `json:"avatar_url"`
-	Provider        string         `json:"provider"`
-	ProviderSubject string         `json:"provider_subject"`
-	CreatedAt       time.Time      `json:"created_at"`
-	UpdatedAt       time.Time      `json:"updated_at"`
+	ID              string    `json:"id"`
+	Email           string    `json:"email"`
+	Name            string    `json:"name"`
+	AvatarUrl       *string   `json:"avatar_url"`
+	Provider        string    `json:"provider"`
+	ProviderSubject string    `json:"provider_subject"`
+	CreatedAt       time.Time `json:"created_at"`
+	UpdatedAt       time.Time `json:"updated_at"`
 }

@@ -7,9 +7,6 @@ package sqlc
 
 import (
 	"context"
-	"database/sql"
-
-	"github.com/google/uuid"
 )
 
 const countUsers = `-- name: CountUsers :one
@@ -17,7 +14,7 @@ SELECT count(*) FROM users
 `
 
 func (q *Queries) CountUsers(ctx context.Context) (int64, error) {
-	row := q.queryRow(ctx, q.countUsersStmt, countUsers)
+	row := q.db.QueryRow(ctx, countUsers)
 	var count int64
 	err := row.Scan(&count)
 	return count, err
@@ -30,12 +27,12 @@ WHERE id = $1
 
 // Hard delete. Sessions cascade via the FK. Prefer soft-delete / anonymize
 // if you have audit or compliance requirements.
-func (q *Queries) DeleteUser(ctx context.Context, id uuid.UUID) (int64, error) {
-	result, err := q.exec(ctx, q.deleteUserStmt, deleteUser, id)
+func (q *Queries) DeleteUser(ctx context.Context, id string) (int64, error) {
+	result, err := q.db.Exec(ctx, deleteUser, id)
 	if err != nil {
 		return 0, err
 	}
-	return result.RowsAffected()
+	return result.RowsAffected(), nil
 }
 
 const getUserByEmail = `-- name: GetUserByEmail :one
@@ -48,7 +45,7 @@ WHERE LOWER(email) = LOWER($1)
 // may have one row per provider, so this can return multiple rows if you allow
 // the same email across providers. If you do, switch to :many and reconcile.
 func (q *Queries) GetUserByEmail(ctx context.Context, lower string) (User, error) {
-	row := q.queryRow(ctx, q.getUserByEmailStmt, getUserByEmail, lower)
+	row := q.db.QueryRow(ctx, getUserByEmail, lower)
 	var i User
 	err := row.Scan(
 		&i.ID,
@@ -77,7 +74,7 @@ type GetUserByEmailAndProviderParams struct {
 
 // Use this instead of GetUserByEmail when you want a single-identity lookup.
 func (q *Queries) GetUserByEmailAndProvider(ctx context.Context, arg GetUserByEmailAndProviderParams) (User, error) {
-	row := q.queryRow(ctx, q.getUserByEmailAndProviderStmt, getUserByEmailAndProvider, arg.Lower, arg.Provider)
+	row := q.db.QueryRow(ctx, getUserByEmailAndProvider, arg.Lower, arg.Provider)
 	var i User
 	err := row.Scan(
 		&i.ID,
@@ -98,8 +95,8 @@ FROM users
 WHERE id = $1
 `
 
-func (q *Queries) GetUserByID(ctx context.Context, id uuid.UUID) (User, error) {
-	row := q.queryRow(ctx, q.getUserByIDStmt, getUserByID, id)
+func (q *Queries) GetUserByID(ctx context.Context, id string) (User, error) {
+	row := q.db.QueryRow(ctx, getUserByID, id)
 	var i User
 	err := row.Scan(
 		&i.ID,
@@ -129,7 +126,7 @@ type GetUserByProviderSubjectParams struct {
 // Exact lookup on the identity key. Used when you already know the provider
 // (e.g. re-authenticating a session whose provider you stored).
 func (q *Queries) GetUserByProviderSubject(ctx context.Context, arg GetUserByProviderSubjectParams) (User, error) {
-	row := q.queryRow(ctx, q.getUserByProviderSubjectStmt, getUserByProviderSubject, arg.Provider, arg.ProviderSubject)
+	row := q.db.QueryRow(ctx, getUserByProviderSubject, arg.Provider, arg.ProviderSubject)
 	var i User
 	err := row.Scan(
 		&i.ID,
@@ -158,7 +155,7 @@ type ListUsersParams struct {
 
 // Admin listing. Keyset pagination on id is safer than OFFSET at scale.
 func (q *Queries) ListUsers(ctx context.Context, arg ListUsersParams) ([]User, error) {
-	rows, err := q.query(ctx, q.listUsersStmt, listUsers, arg.Limit, arg.Offset)
+	rows, err := q.db.Query(ctx, listUsers, arg.Limit, arg.Offset)
 	if err != nil {
 		return nil, err
 	}
@@ -180,9 +177,6 @@ func (q *Queries) ListUsers(ctx context.Context, arg ListUsersParams) ([]User, e
 		}
 		items = append(items, i)
 	}
-	if err := rows.Close(); err != nil {
-		return nil, err
-	}
 	if err := rows.Err(); err != nil {
 		return nil, err
 	}
@@ -199,16 +193,16 @@ RETURNING id, email, name, avatar_url, provider, provider_subject, created_at, u
 `
 
 type UpdateUserProfileParams struct {
-	ID        uuid.UUID      `json:"id"`
-	Name      string         `json:"name"`
-	AvatarUrl sql.NullString `json:"avatar_url"`
+	ID        string  `json:"id"`
+	Name      string  `json:"name"`
+	AvatarUrl *string `json:"avatar_url"`
 }
 
 // Manual profile edit (name / avatar). Deliberately does NOT touch email or
 // provider fields — those come from the IdP and would be overwritten on the
 // next login anyway.
 func (q *Queries) UpdateUserProfile(ctx context.Context, arg UpdateUserProfileParams) (User, error) {
-	row := q.queryRow(ctx, q.updateUserProfileStmt, updateUserProfile, arg.ID, arg.Name, arg.AvatarUrl)
+	row := q.db.QueryRow(ctx, updateUserProfile, arg.ID, arg.Name, arg.AvatarUrl)
 	var i User
 	err := row.Scan(
 		&i.ID,
@@ -223,7 +217,7 @@ func (q *Queries) UpdateUserProfile(ctx context.Context, arg UpdateUserProfilePa
 	return i, err
 }
 
-const upsertUser = `-- name: UpsertUser :one
+const upsertUserByProviderSubject = `-- name: UpsertUserByProviderSubject :one
 INSERT INTO users (
     email,
     name,
@@ -242,20 +236,21 @@ DO UPDATE SET
 RETURNING id, email, name, avatar_url, provider, provider_subject, created_at, updated_at
 `
 
-type UpsertUserParams struct {
-	Email           string         `json:"email"`
-	Name            string         `json:"name"`
-	AvatarUrl       sql.NullString `json:"avatar_url"`
-	Provider        string         `json:"provider"`
-	ProviderSubject string         `json:"provider_subject"`
+type UpsertUserByProviderSubjectParams struct {
+	Email           string  `json:"email"`
+	Name            string  `json:"name"`
+	AvatarUrl       *string `json:"avatar_url"`
+	Provider        string  `json:"provider"`
+	ProviderSubject string  `json:"provider_subject"`
 }
 
-// The one query the OAuth callback actually needs. On first login it inserts;
-// on every subsequent login it refreshes the mutable profile fields and returns
-// the row. provider_subject is the conflict target — email is NOT, because
-// emails change and a collision on email must not merge two identities.
-func (q *Queries) UpsertUser(ctx context.Context, arg UpsertUserParams) (User, error) {
-	row := q.queryRow(ctx, q.upsertUserStmt, upsertUser,
+// Identity is (provider, provider_subject); email is deliberately NOT
+// updated on conflict because it is the second unique key on the table and
+// changing it could collide with another account. If the user's email
+// changes at the provider, that is a product-level "link accounts" flow,
+// not a silent upsert.
+func (q *Queries) UpsertUserByProviderSubject(ctx context.Context, arg UpsertUserByProviderSubjectParams) (User, error) {
+	row := q.db.QueryRow(ctx, upsertUserByProviderSubject,
 		arg.Email,
 		arg.Name,
 		arg.AvatarUrl,

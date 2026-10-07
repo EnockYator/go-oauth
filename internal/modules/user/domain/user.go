@@ -1,32 +1,45 @@
-package domain
+// Package user contains the domain model for the application's users,
+// independent of any identity provider.
+package user
 
-import "github.com/google/uuid"
+import (
+	"errors"
+	"strings"
+	"time"
+)
 
-type UpsertUserParams struct {
+// User is a resource owner known to the application.
+type User struct {
+	ID              string
 	Email           string
 	Name            string
-	AvatarUrl       *string
+	AvatarURL       *string // NULL in DB <-> nil in Go
+	Provider        string
+	ProviderSubject string
+	CreatedAt       time.Time
+	UpdatedAt       time.Time
+}
+
+// UpsertParams are the fields needed to create-or-refresh a user from an
+// OAuth provider's userinfo response.
+type UpsertParams struct {
+	Email           string
+	Name            string
+	AvatarURL       *string
 	Provider        string
 	ProviderSubject string
 }
 
-type GetUserByProviderSubjectParams struct {
-	Provider        string
-	ProviderSubject string
-}
-
-type GetUserByEmailAndProviderParams struct {
-	Lower    string // sqlc names it after the expression; verify in generated file
-	Provider string
-}
-
-type UpdateUserProfileParams struct {
-	ID        uuid.UUID
-	Name      string
-	AvatarUrl *string
-}
-
-type ListUsersParams struct {
-	Limit  int32
-	Offset int32
+// Validate enforces the invariants the database also protects.
+func (p UpsertParams) Validate() error {
+	if strings.TrimSpace(p.Email) == "" {
+		return errors.New("user: email is required")
+	}
+	if strings.TrimSpace(p.Provider) == "" {
+		return errors.New("user: provider is required")
+	}
+	if strings.TrimSpace(p.ProviderSubject) == "" {
+		return errors.New("user: provider subject is required")
+	}
+	return nil
 }
