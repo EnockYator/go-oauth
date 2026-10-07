@@ -16,7 +16,7 @@ import (
 // @Tags Root
 // @Accept json
 // @Produce json
-// @Success 200 {object} root.RootResponse
+// @Success 200 {object} root.RootDTO
 // @Failure 405 {object} response.APIErrorResponse
 // @Router / [get]
 func Root(w http.ResponseWriter, r *http.Request) {

@@ -2,108 +2,87 @@ package middleware
 
 import (
 	"context"
+	"errors"
 	"net/http"
-	"strings"
 
+	"github.com/EnockYator/go-oauth/internal/interfaces/http/cookie"
 	"github.com/EnockYator/go-oauth/internal/interfaces/http/response"
-	auth "github.com/EnockYator/go-oauth/internal/modules/auth/domain"
-	"github.com/EnockYator/go-oauth/internal/modules/auth/infrastructure/jwt"
+	user "github.com/EnockYator/go-oauth/internal/modules/user/domain"
 	"github.com/EnockYator/go-oauth/internal/shared/apperror"
 	"github.com/EnockYator/go-oauth/internal/shared/requestcontext"
 
 	"go.opentelemetry.io/otel/attribute"
+	"go.opentelemetry.io/otel/codes"
 	"go.opentelemetry.io/otel/trace"
 )
 
 type authContextKey struct{}
 
-var claimsKey = authContextKey{}
+var userKey = authContextKey{}
 
-// AuthMiddleware extracts and validates a bearer token, storing the
-// resulting Claims in the request context and also populating the
-// requestcontext values (user_id, tenant_id, roles).
+// SessionValidator is the middleware's port onto the auth application
+// layer. It is satisfied by *application.ValidateSession.
+type SessionValidator interface {
+	Execute(ctx context.Context, rawToken string) (*user.User, error)
+}
+
+// AuthMiddleware authenticates the request by validating the session
+// cookie. On success it:
+//   - stores the authenticated user in the request context (retrievable
+//     via GetUser);
+//   - populates requestcontext with the user ID so that apperror.New can
+//     attach it to error records automatically;
+//   - annotates the active span with the user and provider.
 //
-// Should only be mounted on routes that require authentication.
-func AuthMiddleware(validator jwt.TokenValidator) func(http.Handler) http.Handler {
+// Mount only on routes that require authentication. Public routes must
+// either omit this middleware or be registered on a separate mux.
+func AuthMiddleware(
+	validator SessionValidator,
+	cookieCfg cookie.SessionConfig,
+) func(http.Handler) http.Handler {
 	return func(next http.Handler) http.Handler {
 		return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 			ctx := r.Context()
 			span := trace.SpanFromContext(ctx)
 
-			// Extract token from Authorization header
-			authHeader := r.Header.Get("Authorization")
-			if authHeader == "" {
-				response.WriteError(
-					w,
-					r,
-					apperror.New(
-						ctx,
-						apperror.CodeAuthTokenMissing,
-						"missing authorization header",
-						nil,
-					),
-				)
-				span.SetAttributes(attribute.String("auth.status", "missing_token"))
+			rawToken, ok := cookie.ReadSession(r, cookieCfg)
+			if !ok {
+				span.SetAttributes(attribute.String("auth.status", "no_cookie"))
+				writeUnauthorized(w, r, "authentication required")
 				return
 			}
 
-			parts := strings.SplitN(authHeader, " ", 2)
-			if len(parts) != 2 || !strings.EqualFold(parts[0], "Bearer") || parts[1] == "" {
-				response.WriteError(
-					w,
-					r,
-					apperror.New(
+			u, err := validator.Execute(ctx, rawToken)
+			if err != nil {
+				// ValidateSession always returns *apperror.AppError here,
+				// but defensive handling keeps a buggy implementation from
+				// leaking a nil dereference.
+				var appErr *apperror.AppError
+				if !errors.As(err, &appErr) {
+					appErr = apperror.New(
 						ctx,
-						apperror.CodeAuthTokenInvalid,
-						"invalid authorization format",
-						nil,
-					),
-				)
-				span.SetAttributes(attribute.String("auth.status", "invalid_token_format"))
-				return
-			}
-
-			token := parts[1]
-
-			// Validate token using the provided validator
-			claims, err := validator.Validate(token)
-			if err != nil || claims == nil {
-				span.SetAttributes(attribute.String("auth.status", "invalid_token"))
-
-				code := apperror.CodeAuthTokenInvalid
-
-				if apperror.IsCode(err, apperror.CodeAuthTokenExpired) {
-					code = apperror.CodeAuthTokenExpired
+						apperror.CodeInternalServerError,
+						"authentication failed",
+						err,
+					)
 				}
 
-				response.WriteError(
-					w,
-					r,
-					apperror.New(
-						ctx,
-						code,
-						"invalid or expired token",
-						nil,
-					),
-				)
+				span.SetStatus(codes.Error, "session invalid")
 				span.SetAttributes(
-					attribute.String("auth.status", "invalid_or_expired_token"))
+					attribute.String("auth.status", "invalid"),
+					attribute.String("auth.error_code", string(appErr.Code)),
+				)
+				response.WriteError(w, r, appErr)
 				return
 			}
 
-			// Store claims in context (use value copy to prevent mutation)
-			ctx = context.WithValue(ctx, claimsKey, claims)
+			ctx = context.WithValue(ctx, userKey, u)
+			ctx = requestcontext.WithUserID(ctx, u.ID)
 
-			// Set requestcontext values for easy access
-			ctx = requestcontext.WithUserID(ctx, claims.UserID)
-			ctx = requestcontext.WithTenantID(ctx, claims.TenantID)
-			ctx = requestcontext.WithRoles(ctx, claims.Roles)
-
-			// Add trace attributes for authenticated user
 			span.SetAttributes(
-				attribute.String("auth.user_id", claims.UserID),
-				attribute.String("auth.tenant_id", claims.TenantID),
-				attribute.StringSlice("auth.roles", claims.Roles),
+				attribute.String("auth.status", "ok"),
+				attribute.String("auth.user_id", u.ID),
+				attribute.String("auth.provider", u.Provider),
 			)
 
 			next.ServeHTTP(w, r.WithContext(ctx))
@@ -111,9 +90,17 @@ func AuthMiddleware(validator jwt.TokenValidator) func(http.Handler) http.Handle
 	}
 }
 
-// GetClaims retrieves the authenticated Claims from context.
-// Returns the Claims and a boolean indicating if they were found.
-func GetClaims(ctx context.Context) (auth.Claims, bool) {
-	c, ok := ctx.Value(claimsKey).(auth.Claims)
-	return c, ok
+// GetUser returns the authenticated user stored by AuthMiddleware.
+func GetUser(ctx context.Context) (*user.User, bool) {
+	u, ok := ctx.Value(userKey).(*user.User)
+	return u, ok
+}
+
+func writeUnauthorized(w http.ResponseWriter, r *http.Request, msg string) {
+	response.WriteError(w, r, apperror.New(
+		r.Context(),
+		apperror.CodeAuthSessionExpired,
+		msg,
+		nil,
+	))
 }

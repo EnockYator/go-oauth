@@ -15,7 +15,7 @@ import (
 // @Tags Health
 // @Accept json
 // @Produce json
-// @Success 200 {object} health.HealthResponse
+// @Success 200 {object} health.HealthDTO
 // @Failure 405 {object} response.APIErrorResponse
 // @Router /healthz [get]
 func Healthz(w http.ResponseWriter, r *http.Request) {
