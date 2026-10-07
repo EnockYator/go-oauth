@@ -22,6 +22,8 @@ const (
 	userIDKey
 	tenantIDKey
 	rolesKey
+	clientIPKey
+	clientUAKey
 )
 
 // WithRequestID returns a new context containing the request ID.
@@ -64,6 +66,26 @@ func WithTenantID(ctx context.Context, tenantID string) context.Context {
 // It returns an empty string when no tenant ID is present.
 func GetTenantID(ctx context.Context) string {
 	return getString(ctx, tenantIDKey)
+}
+
+// WithClientIP stores the client's IP address in ctx.
+func WithClientIP(ctx context.Context, ip string) context.Context {
+	return context.WithValue(ctx, clientIPKey, ip)
+}
+
+// GetClientIP returns the client's IP address, or "" when unset.
+func GetClientIP(ctx context.Context) string {
+	return getString(ctx, clientIPKey)
+}
+
+// WithUserAgent stores the request User-Agent in ctx.
+func WithUserAgent(ctx context.Context, ua string) context.Context {
+	return context.WithValue(ctx, clientUAKey, ua)
+}
+
+// GetUserAgent returns the request User-Agent, or "" when unset.
+func GetUserAgent(ctx context.Context) string {
+	return getString(ctx, clientUAKey)
 }
 
 // WithRoles returns a new context containing the authenticated user's roles.

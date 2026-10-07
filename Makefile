@@ -124,10 +124,10 @@ air:
 	air
 
 run-api:
-	go run ./cmd/api/main.go
+	go run ./cmd/api/
 
 run-migrate:
-	go run ./cmd/migrate/main.go
+	go run ./cmd/migrate/
 
 # ===============================
 #	API Documentation
