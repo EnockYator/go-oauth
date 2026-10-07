@@ -37,3 +37,6 @@ tmp/
 
 # Swagger files
 docs/
+
+zip files
+archive*
