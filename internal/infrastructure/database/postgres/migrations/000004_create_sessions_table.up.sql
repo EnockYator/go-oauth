@@ -5,7 +5,7 @@ CREATE TABLE IF NOT EXISTS sessions (
     expires_at   TIMESTAMPTZ NOT NULL,
     revoked_at   TIMESTAMPTZ,
     last_seen    TIMESTAMPTZ NOT NULL DEFAULT NOW(),
-    metadata     JSONB NOT NULL DEFAULT '{}'
+    metadata     JSONB NOT NULL DEFAULT '{}'::jsonb
 );
 
 -- indexes
