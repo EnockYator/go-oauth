@@ -7,14 +7,13 @@ package sqlc
 
 import (
 	"context"
-	"database/sql"
 	"encoding/json"
 	"time"
 
-	"github.com/google/uuid"
+	"github.com/jackc/pgx/v5/pgtype"
 )
 
-const countUserSessions = `-- name: CountUserSessions :one
+const countActiveUserSessions = `-- name: CountActiveUserSessions :one
 SELECT count(*)
 FROM sessions
 WHERE user_id = $1
@@ -22,34 +21,28 @@ WHERE user_id = $1
   AND expires_at > NOW()
 `
 
-func (q *Queries) CountUserSessions(ctx context.Context, userID uuid.UUID) (int64, error) {
-	row := q.queryRow(ctx, q.countUserSessionsStmt, countUserSessions, userID)
+func (q *Queries) CountActiveUserSessions(ctx context.Context, userID string) (int64, error) {
+	row := q.db.QueryRow(ctx, countActiveUserSessions, userID)
 	var count int64
 	err := row.Scan(&count)
 	return count, err
 }
 
 const createSession = `-- name: CreateSession :one
-INSERT INTO sessions (
-    id_hash,
-    user_id,
-    expires_at,
-    metadata
-) VALUES (
-    $1, $2, $3, $4
-)
+INSERT INTO sessions (id_hash, user_id, expires_at, metadata)
+VALUES ($1, $2, $3, $4)
 RETURNING id_hash, user_id, created_at, expires_at, revoked_at, last_seen, metadata
 `
 
 type CreateSessionParams struct {
 	IDHash    string          `json:"id_hash"`
-	UserID    uuid.UUID       `json:"user_id"`
+	UserID    string          `json:"user_id"`
 	ExpiresAt time.Time       `json:"expires_at"`
 	Metadata  json.RawMessage `json:"metadata"`
 }
 
 func (q *Queries) CreateSession(ctx context.Context, arg CreateSessionParams) (Session, error) {
-	row := q.queryRow(ctx, q.createSessionStmt, createSession,
+	row := q.db.QueryRow(ctx, createSession,
 		arg.IDHash,
 		arg.UserID,
 		arg.ExpiresAt,
@@ -76,15 +69,15 @@ WHERE expires_at <= NOW()
 
 // Cleanup job. Hard-deletes rows that are expired, or revoked more than
 // $1::interval ago, so metadata doesn't accumulate forever.
-func (q *Queries) DeleteExpiredSessions(ctx context.Context, dollar_1 int64) (int64, error) {
-	result, err := q.exec(ctx, q.deleteExpiredSessionsStmt, deleteExpiredSessions, dollar_1)
+func (q *Queries) DeleteExpiredSessions(ctx context.Context, dollar_1 pgtype.Interval) (int64, error) {
+	result, err := q.db.Exec(ctx, deleteExpiredSessions, dollar_1)
 	if err != nil {
 		return 0, err
 	}
-	return result.RowsAffected()
+	return result.RowsAffected(), nil
 }
 
-const getSession = `-- name: GetSession :one
+const getActiveSessionByIDHash = `-- name: GetActiveSessionByIDHash :one
 SELECT id_hash, user_id, created_at, expires_at, revoked_at, last_seen, metadata
 FROM sessions
 WHERE id_hash = $1
@@ -92,9 +85,9 @@ WHERE id_hash = $1
   AND expires_at > NOW()
 `
 
-// Valid = not revoked AND not expired. Use after hashing the cookie.
-func (q *Queries) GetSession(ctx context.Context, idHash string) (Session, error) {
-	row := q.queryRow(ctx, q.getSessionStmt, getSession, idHash)
+// Valid = not revoked AND not expired. Used after hashing the cookie.
+func (q *Queries) GetActiveSessionByIDHash(ctx context.Context, idHash string) (Session, error) {
+	row := q.db.QueryRow(ctx, getActiveSessionByIDHash, idHash)
 	var i Session
 	err := row.Scan(
 		&i.IDHash,
@@ -108,7 +101,7 @@ func (q *Queries) GetSession(ctx context.Context, idHash string) (Session, error
 	return i, err
 }
 
-const getSessionWithUser = `-- name: GetSessionWithUser :one
+const getActiveSessionWithUserByIDHash = `-- name: GetActiveSessionWithUserByIDHash :one
 SELECT
     s.id_hash,
     s.user_id,
@@ -129,9 +122,9 @@ WHERE s.id_hash = $1
   AND s.expires_at > NOW()
 `
 
-type GetSessionWithUserRow struct {
+type GetActiveSessionWithUserByIDHashRow struct {
 	IDHash          string          `json:"id_hash"`
-	UserID          uuid.UUID       `json:"user_id"`
+	UserID          string          `json:"user_id"`
 	CreatedAt       time.Time       `json:"created_at"`
 	ExpiresAt       time.Time       `json:"expires_at"`
 	RevokedAt       *time.Time      `json:"revoked_at"`
@@ -139,15 +132,16 @@ type GetSessionWithUserRow struct {
 	Metadata        json.RawMessage `json:"metadata"`
 	Email           string          `json:"email"`
 	Name            string          `json:"name"`
-	AvatarUrl       sql.NullString  `json:"avatar_url"`
+	AvatarUrl       *string         `json:"avatar_url"`
 	Provider        string          `json:"provider"`
 	ProviderSubject string          `json:"provider_subject"`
 }
 
-// Same validity rules, joined to the user so middleware can skip a second query.
-func (q *Queries) GetSessionWithUser(ctx context.Context, idHash string) (GetSessionWithUserRow, error) {
-	row := q.queryRow(ctx, q.getSessionWithUserStmt, getSessionWithUser, idHash)
-	var i GetSessionWithUserRow
+// Valid = not revoked AND not expired
+// Joined to the user.
+func (q *Queries) GetActiveSessionWithUserByIDHash(ctx context.Context, idHash string) (GetActiveSessionWithUserByIDHashRow, error) {
+	row := q.db.QueryRow(ctx, getActiveSessionWithUserByIDHash, idHash)
+	var i GetActiveSessionWithUserByIDHashRow
 	err := row.Scan(
 		&i.IDHash,
 		&i.UserID,
@@ -165,7 +159,28 @@ func (q *Queries) GetSessionWithUser(ctx context.Context, idHash string) (GetSes
 	return i, err
 }
 
-const listUserSessions = `-- name: ListUserSessions :many
+const getSessionByIDHash = `-- name: GetSessionByIDHash :one
+SELECT id_hash, user_id, created_at, expires_at, revoked_at, last_seen, metadata FROM sessions
+WHERE id_hash = $1
+`
+
+// Can be active / inactive session (expired / revoked)
+func (q *Queries) GetSessionByIDHash(ctx context.Context, idHash string) (Session, error) {
+	row := q.db.QueryRow(ctx, getSessionByIDHash, idHash)
+	var i Session
+	err := row.Scan(
+		&i.IDHash,
+		&i.UserID,
+		&i.CreatedAt,
+		&i.ExpiresAt,
+		&i.RevokedAt,
+		&i.LastSeen,
+		&i.Metadata,
+	)
+	return i, err
+}
+
+const listUserActiveSessions = `-- name: ListUserActiveSessions :many
 SELECT
     id_hash,
     created_at,
@@ -179,7 +194,7 @@ WHERE user_id = $1
 ORDER BY last_seen DESC
 `
 
-type ListUserSessionsRow struct {
+type ListUserActiveSessionsRow struct {
 	IDHash    string          `json:"id_hash"`
 	CreatedAt time.Time       `json:"created_at"`
 	ExpiresAt time.Time       `json:"expires_at"`
@@ -188,15 +203,15 @@ type ListUserSessionsRow struct {
 }
 
 // "Active sessions" UI. Returns live sessions only, newest first.
-func (q *Queries) ListUserSessions(ctx context.Context, userID uuid.UUID) ([]ListUserSessionsRow, error) {
-	rows, err := q.query(ctx, q.listUserSessionsStmt, listUserSessions, userID)
+func (q *Queries) ListUserActiveSessions(ctx context.Context, userID string) ([]ListUserActiveSessionsRow, error) {
+	rows, err := q.db.Query(ctx, listUserActiveSessions, userID)
 	if err != nil {
 		return nil, err
 	}
 	defer rows.Close()
-	items := []ListUserSessionsRow{}
+	items := []ListUserActiveSessionsRow{}
 	for rows.Next() {
-		var i ListUserSessionsRow
+		var i ListUserActiveSessionsRow
 		if err := rows.Scan(
 			&i.IDHash,
 			&i.CreatedAt,
@@ -208,32 +223,13 @@ func (q *Queries) ListUserSessions(ctx context.Context, userID uuid.UUID) ([]Lis
 		}
 		items = append(items, i)
 	}
-	if err := rows.Close(); err != nil {
-		return nil, err
-	}
 	if err := rows.Err(); err != nil {
 		return nil, err
 	}
 	return items, nil
 }
 
-const revokeSession = `-- name: RevokeSession :execrows
-UPDATE sessions
-SET revoked_at = NOW()
-WHERE id_hash = $1
-  AND revoked_at IS NULL
-`
-
-// Logout for a single session. Soft revoke — keeps the audit trail in metadata.
-func (q *Queries) RevokeSession(ctx context.Context, idHash string) (int64, error) {
-	result, err := q.exec(ctx, q.revokeSessionStmt, revokeSession, idHash)
-	if err != nil {
-		return 0, err
-	}
-	return result.RowsAffected()
-}
-
-const revokeUserSessions = `-- name: RevokeUserSessions :execrows
+const revokeAllUserSessions = `-- name: RevokeAllUserSessions :execrows
 UPDATE sessions
 SET revoked_at = NOW()
 WHERE user_id = $1
@@ -241,15 +237,31 @@ WHERE user_id = $1
 `
 
 // "Log out everywhere" / revoke all on password or privilege change.
-func (q *Queries) RevokeUserSessions(ctx context.Context, userID uuid.UUID) (int64, error) {
-	result, err := q.exec(ctx, q.revokeUserSessionsStmt, revokeUserSessions, userID)
+func (q *Queries) RevokeAllUserSessions(ctx context.Context, userID string) (int64, error) {
+	result, err := q.db.Exec(ctx, revokeAllUserSessions, userID)
 	if err != nil {
 		return 0, err
 	}
-	return result.RowsAffected()
+	return result.RowsAffected(), nil
 }
 
-const revokeUserSessionsExcept = `-- name: RevokeUserSessionsExcept :execrows
+const revokeSessionByIDHash = `-- name: RevokeSessionByIDHash :execrows
+UPDATE sessions
+SET revoked_at = NOW()
+WHERE id_hash = $1
+  AND revoked_at IS NULL
+`
+
+// Logout for a single session. Soft revoke — keeps the audit trail in metadata.
+func (q *Queries) RevokeSessionByIDHash(ctx context.Context, idHash string) (int64, error) {
+	result, err := q.db.Exec(ctx, revokeSessionByIDHash, idHash)
+	if err != nil {
+		return 0, err
+	}
+	return result.RowsAffected(), nil
+}
+
+const revokeUserSessionsExceptCurrent = `-- name: RevokeUserSessionsExceptCurrent :execrows
 UPDATE sessions
 SET revoked_at = NOW()
 WHERE user_id = $1
@@ -257,40 +269,42 @@ WHERE user_id = $1
   AND revoked_at IS NULL
 `
 
-type RevokeUserSessionsExceptParams struct {
-	UserID uuid.UUID `json:"user_id"`
-	IDHash string    `json:"id_hash"`
+type RevokeUserSessionsExceptCurrentParams struct {
+	UserID string `json:"user_id"`
+	IDHash string `json:"id_hash"`
 }
 
 // Rotate on login: kill all other sessions, keep the one just created.
-func (q *Queries) RevokeUserSessionsExcept(ctx context.Context, arg RevokeUserSessionsExceptParams) (int64, error) {
-	result, err := q.exec(ctx, q.revokeUserSessionsExceptStmt, revokeUserSessionsExcept, arg.UserID, arg.IDHash)
+func (q *Queries) RevokeUserSessionsExceptCurrent(ctx context.Context, arg RevokeUserSessionsExceptCurrentParams) (int64, error) {
+	result, err := q.db.Exec(ctx, revokeUserSessionsExceptCurrent, arg.UserID, arg.IDHash)
 	if err != nil {
 		return 0, err
 	}
-	return result.RowsAffected()
+	return result.RowsAffected(), nil
 }
 
-const touchSession = `-- name: TouchSession :execrows
+const touchSessionLastSeen = `-- name: TouchSessionLastSeen :one
 UPDATE sessions
-SET last_seen  = NOW(),
-    expires_at = NOW() + $2::interval
+SET last_seen = NOW()
 WHERE id_hash = $1
   AND revoked_at IS NULL
   AND expires_at > NOW()
+RETURNING id_hash, user_id, created_at, expires_at, revoked_at, last_seen, metadata
 `
 
-type TouchSessionParams struct {
-	IDHash  string `json:"id_hash"`
-	Column2 int64  `json:"column_2"`
-}
-
-// Sliding renewal: bump last_seen and push expires_at forward.
-// Call on authenticated requests, throttled (e.g. only if last_seen < now() - 1m).
-func (q *Queries) TouchSession(ctx context.Context, arg TouchSessionParams) (int64, error) {
-	result, err := q.exec(ctx, q.touchSessionStmt, touchSession, arg.IDHash, arg.Column2)
-	if err != nil {
-		return 0, err
-	}
-	return result.RowsAffected()
+// Update activity without extending the absolute session lifetime.
+// Call on authenticated requests only after a small application-level throttle.
+func (q *Queries) TouchSessionLastSeen(ctx context.Context, idHash string) (Session, error) {
+	row := q.db.QueryRow(ctx, touchSessionLastSeen, idHash)
+	var i Session
+	err := row.Scan(
+		&i.IDHash,
+		&i.UserID,
+		&i.CreatedAt,
+		&i.ExpiresAt,
+		&i.RevokedAt,
+		&i.LastSeen,
+		&i.Metadata,
+	)
+	return i, err
 }
