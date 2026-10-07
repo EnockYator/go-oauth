@@ -1,8 +1,9 @@
--- name: UpsertUser :one
--- The one query the OAuth callback actually needs. On first login it inserts;
--- on every subsequent login it refreshes the mutable profile fields and returns
--- the row. provider_subject is the conflict target — email is NOT, because
--- emails change and a collision on email must not merge two identities.
+-- name: UpsertUserByProviderSubject :one
+-- Identity is (provider, provider_subject); email is deliberately NOT
+-- updated on conflict because it is the second unique key on the table and
+-- changing it could collide with another account. If the user's email
+-- changes at the provider, that is a product-level "link accounts" flow,
+-- not a silent upsert.
 INSERT INTO users (
     email,
     name,
