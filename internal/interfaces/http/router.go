@@ -94,8 +94,8 @@ func NewRouter(cfg RouterConfig) (*Router, error) {
 	))
 
 	// Public auth endpoints.
-	publicMux.HandleFunc("GET /auth/login/{provider}", cfg.AuthHandler.Login)
-	publicMux.HandleFunc("GET /auth/callback/{provider}", cfg.AuthHandler.Callback)
+	publicMux.HandleFunc("GET /auth/{provider}/login", cfg.AuthHandler.Login)
+	publicMux.HandleFunc("GET /auth/{provider}/callback", cfg.AuthHandler.Callback)
 	publicMux.HandleFunc("POST /auth/logout", cfg.AuthHandler.Logout)
 
 	// Fallback: any unmatched path returns 404.
